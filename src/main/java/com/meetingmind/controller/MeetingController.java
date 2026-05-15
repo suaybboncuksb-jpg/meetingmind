@@ -41,4 +41,9 @@ public class MeetingController {
         meetingService.deleteMeeting(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/analyze")
+    public ResponseEntity<Meeting> analyzeMeeting(@PathVariable Long id) {
+        return ResponseEntity.ok(meetingService.analyzeMeeting(id));
+    }
 }
