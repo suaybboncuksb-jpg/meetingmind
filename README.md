@@ -1,7 +1,7 @@
-# MeetingMind 🧠
+# MeetingMind 
 
 > AI-powered meeting protocol tool — automatically summarizes meetings and extracts action items using Google Gemini API.
-
+> **Frontend Repository:** [meetingmind-frontend](https://github.com/suaybboncuksb-jpg/meetingmind-frontend)
 ## Problem it solves
 After meetings, action items and decisions are often unclear or forgotten. MeetingMind lets teams capture meeting protocols and uses AI to automatically generate summaries and extract tasks — saving time and improving follow-through.
 
