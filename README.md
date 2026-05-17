@@ -1,69 +1,128 @@
-# MeetingMind 
+# MeetingMind — Backend
 
-> AI-powered meeting protocol tool — automatically summarizes meetings and extracts action items using Google Gemini API.
-> **Frontend Repository:** [meetingmind-frontend](https://github.com/suaybboncuksb-jpg/meetingmind-frontend)
-## Problem it solves
-After meetings, action items and decisions are often unclear or forgotten. MeetingMind lets teams capture meeting protocols and uses AI to automatically generate summaries and extract tasks — saving time and improving follow-through.
+![Java](https://img.shields.io/badge/Java-17-ED8B00?style=flat-square&logo=java)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-6DB33F?style=flat-square&logo=spring-boot)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=flat-square&logo=postgresql)
+![Google Gemini](https://img.shields.io/badge/Google_Gemini-AI-4285F4?style=flat-square&logo=google)
+![Maven](https://img.shields.io/badge/Maven-Build-C71A36?style=flat-square&logo=apache-maven)
 
-## Tech Stack
-- **Backend:** Java 17, Spring Boot 3.5, Spring Data JPA
-- **Database:** PostgreSQL
-- **AI:** Google Gemini API (gemini-2.0-flash-lite)
-- **Build:** Maven
+> REST API Backend für MeetingMind — KI-gestütztes Meeting-Management mit Google Gemini AI.  
+> Developed as a portfolio project for IT/AI consulting applications.
+
+---
 
 ## Features
-- Create and manage meeting records
-- Capture free-text meeting protocols
-- AI-powered analysis: automatic summary + task extraction
-- REST API ready for frontend integration
 
-## API Endpoints
+- **REST API** — Vollständige CRUD-Operationen für Meetings und Aufgaben
+- **Google Gemini AI** — Automatische Protokoll-Analyse und Aufgaben-Erkennung
+- **PostgreSQL** — Persistente Datenspeicherung mit JPA/Hibernate
+- **Spring Boot** — Production-ready Backend mit Auto-Configuration
+- **CORS** — Konfiguriert für Frontend-Kommunikation
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/meetings` | Get all meetings |
-| GET | `/api/meetings/{id}` | Get meeting by ID |
-| POST | `/api/meetings` | Create new meeting |
-| PUT | `/api/meetings/{id}` | Update meeting |
-| DELETE | `/api/meetings/{id}` | Delete meeting |
-| POST | `/api/meetings/{id}/analyze` | Analyze protocol with Gemini AI |
+---
 
-## Quick Start
+## Tech Stack
 
-### Prerequisites
+| Technologie | Verwendung |
+|---|---|
+| Java 17 | Programmiersprache |
+| Spring Boot 3.5 | Backend Framework |
+| Spring Data JPA | Datenbank-Abstraktion |
+| Hibernate | ORM |
+| PostgreSQL 16 | Relationale Datenbank |
+| Google Gemini AI | KI-Analyse (`gemini-2.0-flash-lite`) |
+| Maven | Build Tool |
+| Lombok | Boilerplate Reduktion |
+
+---
+
+## API Endpunkte
+
+| Method | Endpoint | Beschreibung |
+|---|---|---|
+| `GET` | `/api/meetings` | Alle Meetings abrufen |
+| `POST` | `/api/meetings` | Neues Meeting erstellen |
+| `PUT` | `/api/meetings/{id}` | Meeting aktualisieren |
+| `DELETE` | `/api/meetings/{id}` | Meeting löschen |
+| `POST` | `/api/meetings/{id}/analyze` | KI-Analyse mit Gemini starten |
+
+---
+
+## Setup & Installation
+
+### Voraussetzungen
 - Java 17+
-- PostgreSQL
-- Google Gemini API Key ([Get one here](https://aistudio.google.com))
+- PostgreSQL 16
+- Google Gemini API Key ([kostenlos hier](https://ai.google.dev))
 
-### Setup
+### Datenbank einrichten
+
+```sql
+CREATE DATABASE meetingmind;
+```
+
+### Konfiguration
+
+`src/main/resources/application.properties`:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/meetingmind
+spring.datasource.username=DEIN_USERNAME
+spring.datasource.password=DEIN_PASSWORT
+spring.jpa.hibernate.ddl-auto=update
+gemini.api.key=DEIN_GEMINI_API_KEY
+```
+
+### Starten
+
 ```bash
-# Clone the repository
 git clone https://github.com/suaybboncuksb-jpg/meetingmind.git
 cd meetingmind
-
-# Configure database and API key
-# Edit src/main/resources/application.properties:
-# spring.datasource.username=YOUR_DB_USER
-# gemini.api.key=YOUR_GEMINI_KEY
-
-# Run
 ./mvnw spring-boot:run
 ```
 
-### Example: Analyze a meeting
-```bash
-# Create a meeting
-curl -X POST http://localhost:8080/api/meetings \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Sprint Planning",
-    "location": "Conference Room A",
-    "meetingDate": "2026-05-15T10:00:00",
-    "protocolText": "Max will handle DB optimization by Friday. Sarah creates the dashboard by end of sprint."
-  }'
+Das Backend läuft auf `http://localhost:8080`.
 
-# Analyze with AI (returns summary + extracted tasks)
-curl -X POST http://localhost:8080/api/meetings/1/analyze
+---
+
+## Datenmodell
+
+Meeting
+├── id (Long)
+├── title (String)
+├── location (String)
+├── meetingDate (LocalDateTime)
+├── protocolText (String)
+├── aiSummary (String)
+├── createdAt (LocalDateTime)
+├── tasks (List<Task>)
+└── participants (List<String>)
+Task
+├── id (Long)
+├── description (String)
+├── assignedTo (String)
+├── dueDate (String)
+└── status (String)
+---
+
+## KI-Integration
+
+Die Gemini AI Integration analysiert Meeting-Protokolle und erstellt:
+- Eine strukturierte Zusammenfassung
+- Eine Liste erkannter Aufgaben mit Verantwortlichen und Fristen
+
+```java
+// GeminiService sendet Protokolltext an Gemini API
+POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent
 ```
 
-## Project Structure
+---
+
+## Related
+
+- [MeetingMind Frontend](https://github.com/suaybboncuksb-jpg/meetingmind-frontend) — React + Web Speech API + jsPDF
+
+---
+
+*Portfolio Projekt · Wirtschaftsinformatik · IT/KI-Beratung*# MeetingMind — Backend
+
