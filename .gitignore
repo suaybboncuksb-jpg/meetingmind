@@ -34,3 +34,4 @@ build/
 .vscode/
 node_modules/
 node_modules/
+src/main/resources/application.properties
