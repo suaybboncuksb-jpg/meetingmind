@@ -13,6 +13,8 @@ public class Task {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String title;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 
@@ -22,6 +24,9 @@ public class Task {
     @Enumerated(EnumType.STRING)
     private TaskStatus status = TaskStatus.OPEN;
 
+    @Enumerated(EnumType.STRING)
+    private TaskPriority priority = TaskPriority.MEDIUM;
+
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "meeting_id")
@@ -29,5 +34,9 @@ public class Task {
 
     public enum TaskStatus {
         OPEN, IN_PROGRESS, DONE
+    }
+
+    public enum TaskPriority {
+        LOW, MEDIUM, HIGH
     }
 }

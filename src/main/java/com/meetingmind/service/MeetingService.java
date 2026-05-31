@@ -1,6 +1,5 @@
 package com.meetingmind.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.meetingmind.dto.AiAnalysisResponse;
 import com.meetingmind.model.Meeting;
 import com.meetingmind.model.Task;
@@ -8,6 +7,7 @@ import com.meetingmind.repository.MeetingRepository;
 import com.meetingmind.repository.TaskRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
@@ -17,7 +17,6 @@ public class MeetingService {
     private final MeetingRepository meetingRepository;
     private final TaskRepository taskRepository;
     private final GeminiService geminiService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public List<Meeting> getAllMeetings() {
         return meetingRepository.findAllByOrderByMeetingDateDesc();
@@ -38,10 +37,12 @@ public class MeetingService {
 
     public Meeting updateMeeting(Long id, Meeting updated) {
         Meeting existing = getMeetingById(id);
+
         existing.setTitle(updated.getTitle());
         existing.setLocation(updated.getLocation());
         existing.setMeetingDate(updated.getMeetingDate());
         existing.setProtocolText(updated.getProtocolText());
+
         return meetingRepository.save(existing);
     }
 
@@ -52,49 +53,123 @@ public class MeetingService {
     public Meeting analyzeMeeting(Long id) {
         Meeting meeting = getMeetingById(id);
 
+        if (meeting.getProtocolText() == null || meeting.getProtocolText().isBlank()) {
+            throw new RuntimeException("Meeting-Protokoll ist leer. KI-Analyse nicht möglich.");
+        }
+
         AiAnalysisResponse analysis = geminiService.analyzeMeetingProtocol(meeting.getProtocolText());
 
-        // Summary mit allen Feldern aufbauen
+        meeting.setAiSummary(buildSummaryText(analysis));
+
+        deleteExistingTasksForMeeting(meeting);
+        createTasksFromTodos(meeting, analysis);
+
+        return meetingRepository.save(meeting);
+    }
+
+    private String buildSummaryText(AiAnalysisResponse analysis) {
         StringBuilder summaryBuilder = new StringBuilder();
-        summaryBuilder.append(analysis.getSummary());
+
+        if (analysis.getSummary() != null && !analysis.getSummary().isBlank()) {
+            summaryBuilder.append(analysis.getSummary());
+        }
 
         if (analysis.getDecisions() != null && !analysis.getDecisions().isEmpty()) {
             summaryBuilder.append("\n\nEntscheidungen:\n");
-            analysis.getDecisions().forEach(d -> summaryBuilder.append("• ").append(d).append("\n"));
+            analysis.getDecisions()
+                    .forEach(decision -> summaryBuilder.append("• ").append(decision).append("\n"));
         }
+
         if (analysis.getOpenQuestions() != null && !analysis.getOpenQuestions().isEmpty()) {
             summaryBuilder.append("\nOffene Fragen:\n");
-            analysis.getOpenQuestions().forEach(q -> summaryBuilder.append("• ").append(q).append("\n"));
+            analysis.getOpenQuestions()
+                    .forEach(question -> summaryBuilder.append("• ").append(question).append("\n"));
         }
+
         if (analysis.getRisks() != null && !analysis.getRisks().isEmpty()) {
             summaryBuilder.append("\nRisiken:\n");
-            analysis.getRisks().forEach(r -> summaryBuilder.append("• ").append(r).append("\n"));
+            analysis.getRisks()
+                    .forEach(risk -> summaryBuilder.append("• ").append(risk).append("\n"));
         }
+
         if (analysis.getNextSteps() != null && !analysis.getNextSteps().isEmpty()) {
             summaryBuilder.append("\nNächste Schritte:\n");
-            analysis.getNextSteps().forEach(n -> summaryBuilder.append("• ").append(n).append("\n"));
+            analysis.getNextSteps()
+                    .forEach(nextStep -> summaryBuilder.append("• ").append(nextStep).append("\n"));
         }
 
-        meeting.setAiSummary(summaryBuilder.toString());
+        return summaryBuilder.toString();
+    }
 
-        // Bestehende Tasks löschen
+    private void deleteExistingTasksForMeeting(Meeting meeting) {
+        List<Task> existingTasks = taskRepository.findByMeetingId(meeting.getId());
+
+        if (existingTasks != null && !existingTasks.isEmpty()) {
+            taskRepository.deleteAll(existingTasks);
+        }
+
         if (meeting.getTasks() != null) {
-            taskRepository.deleteAll(meeting.getTasks());
+            meeting.getTasks().clear();
+        }
+    }
+
+    private void createTasksFromTodos(Meeting meeting, AiAnalysisResponse analysis) {
+        if (analysis.getTodos() == null || analysis.getTodos().isEmpty()) {
+            return;
         }
 
-        // Todos speichern
-        if (analysis.getTodos() != null) {
-            for (AiAnalysisResponse.TodoItem todo : analysis.getTodos()) {
-                Task task = new Task();
-                task.setDescription(todo.getTask());
-                task.setAssignedTo(todo.getOwner());
-                task.setDueDate(todo.getDeadline());
-                task.setStatus(Task.TaskStatus.OPEN);
-                task.setMeeting(meeting);
-                taskRepository.save(task);
+        for (AiAnalysisResponse.TodoItem todo : analysis.getTodos()) {
+            if (todo.getTask() == null || todo.getTask().isBlank()) {
+                continue;
             }
+
+            Task task = new Task();
+
+            task.setTitle(todo.getTask());
+            task.setDescription(todo.getTask());
+            task.setAssignedTo(normalizeOwner(todo.getOwner()));
+            task.setDueDate(normalizeDeadline(todo.getDeadline()));
+            task.setStatus(Task.TaskStatus.OPEN);
+            task.setPriority(mapPriority(todo.getPriority()));
+            task.setMeeting(meeting);
+
+            taskRepository.save(task);
+        }
+    }
+
+    private String normalizeOwner(String owner) {
+        if (owner == null || owner.isBlank()) {
+            return "Nicht zugewiesen";
         }
 
-        return meetingRepository.save(meeting);
+        if (owner.equalsIgnoreCase("nicht genannt")) {
+            return "Nicht zugewiesen";
+        }
+
+        return owner;
+    }
+
+    private String normalizeDeadline(String deadline) {
+        if (deadline == null || deadline.isBlank()) {
+            return "Nicht genannt";
+        }
+
+        if (deadline.equalsIgnoreCase("nicht genannt")) {
+            return "Nicht genannt";
+        }
+
+        return deadline;
+    }
+
+    private Task.TaskPriority mapPriority(String priority) {
+        if (priority == null || priority.isBlank()) {
+            return Task.TaskPriority.MEDIUM;
+        }
+
+        return switch (priority.toLowerCase()) {
+            case "hoch", "high" -> Task.TaskPriority.HIGH;
+            case "niedrig", "low" -> Task.TaskPriority.LOW;
+            default -> Task.TaskPriority.MEDIUM;
+        };
     }
 }
