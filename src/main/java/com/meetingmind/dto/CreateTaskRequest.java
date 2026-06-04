@@ -9,6 +9,7 @@ public class CreateTaskRequest {
     private String status;
     private String priority;
     private Long meetingId;
+    private Long assignedUserId;
 
     public CreateTaskRequest() {
     }
@@ -41,6 +42,10 @@ public class CreateTaskRequest {
         return meetingId;
     }
 
+    public Long getAssignedUserId() {
+        return assignedUserId;
+    }
+
     public void setTitle(String title) {
         this.title = title;
     }
@@ -67,5 +72,9 @@ public class CreateTaskRequest {
 
     public void setMeetingId(Long meetingId) {
         this.meetingId = meetingId;
+    }
+
+    public void setAssignedUserId(Long assignedUserId) {
+        this.assignedUserId = assignedUserId;
     }
 }

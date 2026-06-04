@@ -9,6 +9,7 @@ import com.meetingmind.service.TaskService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,9 +27,31 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @PostMapping("/my")
+    public ResponseEntity<TaskResponse> createMyTask(
+            @RequestBody CreateTaskRequest request,
+            Authentication authentication
+    ) {
+        validateAuthentication(authentication);
+
+        TaskResponse response = taskService.createTaskForCurrentUser(
+                request,
+                authentication.getName()
+        );
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
     @GetMapping
     public ResponseEntity<List<TaskResponse>> getAllTasks() {
         return ResponseEntity.ok(taskService.getAllTasks());
+    }
+
+    @GetMapping("/my")
+    public ResponseEntity<List<TaskResponse>> getMyTasks(Authentication authentication) {
+        validateAuthentication(authentication);
+
+        return ResponseEntity.ok(taskService.getMyTasks(authentication.getName()));
     }
 
     @GetMapping("/meeting/{meetingId}")
@@ -60,6 +83,12 @@ public class TaskController {
             return Task.TaskStatus.valueOf(request.getStatus().trim().toUpperCase());
         } catch (IllegalArgumentException ex) {
             throw new ValidationException("Ungültiger Task-Status: " + request.getStatus());
+        }
+    }
+
+    private void validateAuthentication(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().trim().isEmpty()) {
+            throw new ValidationException("Für diese Aktion musst du eingeloggt sein.");
         }
     }
 }

@@ -13,8 +13,13 @@ public class TaskResponse {
     private String dueDate;
     private String status;
     private String priority;
+
     private Long meetingId;
     private String meetingTitle;
+
+    private Long assignedUserId;
+    private String assignedToName;
+    private String assignedToEmail;
 
     public static TaskResponse from(Task task) {
         TaskResponse response = new TaskResponse();
@@ -36,6 +41,12 @@ public class TaskResponse {
         if (task.getMeeting() != null) {
             response.setMeetingId(task.getMeeting().getId());
             response.setMeetingTitle(task.getMeeting().getTitle());
+        }
+
+        if (task.getAssignedUser() != null) {
+            response.setAssignedUserId(task.getAssignedUser().getId());
+            response.setAssignedToName(task.getAssignedUser().getName());
+            response.setAssignedToEmail(task.getAssignedUser().getEmail());
         }
 
         return response;

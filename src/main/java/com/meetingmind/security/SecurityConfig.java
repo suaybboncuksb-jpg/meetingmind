@@ -39,17 +39,22 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                        // Öffentliche Auth-Endpunkte
                         .requestMatchers("/api/auth/register").permitAll()
                         .requestMatchers("/api/auth/login").permitAll()
                         .requestMatchers("/api/auth/verify").permitAll()
                         .requestMatchers("/api/auth/forgot-password").permitAll()
                         .requestMatchers("/api/auth/reset-password").permitAll()
 
+                        // Geschützte Auth-Endpunkte
                         .requestMatchers("/api/auth/me").authenticated()
 
-                        // V1: Meeting-/Task-APIs bleiben erstmal offen,
-                        // damit Frontend und bestehende Logik nicht kaputtgehen.
-                        // Später ändern wir das auf authenticated().
+                        // Persönliche Tasks müssen geschützt sein
+                        .requestMatchers("/api/tasks/my").authenticated()
+
+                        // V1: Bestehende Meeting-/Task-APIs bleiben erstmal offen,
+                        // damit Frontend und KI-/Meeting-Logik nicht kaputtgehen.
+                        // Später ändern wir diese Endpunkte ebenfalls auf authenticated().
                         .requestMatchers("/api/meetings/**").permitAll()
                         .requestMatchers("/api/tasks/**").permitAll()
 

@@ -10,4 +10,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByMeetingId(Long meetingId);
 
     List<Task> findAllByOrderByIdDesc();
+
+    List<Task> findByAssignedUserIdOrderByIdDesc(Long assignedUserId);
 }

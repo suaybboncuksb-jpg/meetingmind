@@ -19,6 +19,7 @@ public class Task {
     private String description;
 
     private String assignedTo;
+
     private String dueDate;
 
     @Enumerated(EnumType.STRING)
@@ -31,6 +32,11 @@ public class Task {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "meeting_id")
     private Meeting meeting;
+
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_user_id")
+    private User assignedUser;
 
     public enum TaskStatus {
         OPEN, IN_PROGRESS, DONE
