@@ -23,6 +23,17 @@ public class User {
     @Enumerated(EnumType.STRING)
     private UserRole role = UserRole.USER;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean enabled = false;
+
+    private String verificationToken;
+
+    private LocalDateTime verificationTokenExpiresAt;
+
+    private String passwordResetToken;
+
+    private LocalDateTime passwordResetTokenExpiresAt;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public User() {
@@ -33,6 +44,7 @@ public class User {
         this.email = email;
         this.passwordHash = passwordHash;
         this.role = role;
+        this.enabled = false;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -54,6 +66,26 @@ public class User {
 
     public UserRole getRole() {
         return role;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public String getVerificationToken() {
+        return verificationToken;
+    }
+
+    public LocalDateTime getVerificationTokenExpiresAt() {
+        return verificationTokenExpiresAt;
+    }
+
+    public String getPasswordResetToken() {
+        return passwordResetToken;
+    }
+
+    public LocalDateTime getPasswordResetTokenExpiresAt() {
+        return passwordResetTokenExpiresAt;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -78,6 +110,26 @@ public class User {
 
     public void setRole(UserRole role) {
         this.role = role;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public void setVerificationToken(String verificationToken) {
+        this.verificationToken = verificationToken;
+    }
+
+    public void setVerificationTokenExpiresAt(LocalDateTime verificationTokenExpiresAt) {
+        this.verificationTokenExpiresAt = verificationTokenExpiresAt;
+    }
+
+    public void setPasswordResetToken(String passwordResetToken) {
+        this.passwordResetToken = passwordResetToken;
+    }
+
+    public void setPasswordResetTokenExpiresAt(LocalDateTime passwordResetTokenExpiresAt) {
+        this.passwordResetTokenExpiresAt = passwordResetTokenExpiresAt;
     }
 
     public void setCreatedAt(LocalDateTime createdAt) {

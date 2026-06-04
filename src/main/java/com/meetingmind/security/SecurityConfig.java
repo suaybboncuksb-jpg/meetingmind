@@ -1,5 +1,6 @@
 package com.meetingmind.security;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -14,8 +15,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -39,13 +38,20 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/register", "/api/auth/login").permitAll()
+
+                        .requestMatchers("/api/auth/register").permitAll()
+                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/verify").permitAll()
+                        .requestMatchers("/api/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/auth/reset-password").permitAll()
+
                         .requestMatchers("/api/auth/me").authenticated()
 
-                        // Wichtig für V1:
-                        // Bestehende Meeting-/Task-APIs bleiben erstmal offen,
-                        // damit nichts kaputtgeht. Später schützen wir /api/** komplett.
-                        .requestMatchers("/api/**").permitAll()
+                        // V1: Meeting-/Task-APIs bleiben erstmal offen,
+                        // damit Frontend und bestehende Logik nicht kaputtgehen.
+                        // Später ändern wir das auf authenticated().
+                        .requestMatchers("/api/meetings/**").permitAll()
+                        .requestMatchers("/api/tasks/**").permitAll()
 
                         .anyRequest().permitAll()
                 )
@@ -64,12 +70,11 @@ public class SecurityConfig {
             public CorsConfiguration getCorsConfiguration(HttpServletRequest request) {
                 CorsConfiguration config = new CorsConfiguration();
 
-                config.setAllowedOrigins(List.of(
-                        "http://localhost:3000",
-                        "http://127.0.0.1:3000",
-                        "http://localhost:5173",
-                        "http://127.0.0.1:5173"
+                config.setAllowedOriginPatterns(List.of(
+                        "http://localhost:*",
+                        "http://127.0.0.1:*"
                 ));
+
                 config.setAllowedMethods(List.of(
                         "GET",
                         "POST",
@@ -78,7 +83,18 @@ public class SecurityConfig {
                         "DELETE",
                         "OPTIONS"
                 ));
-                config.setAllowedHeaders(List.of("*"));
+
+                config.setAllowedHeaders(List.of(
+                        "Authorization",
+                        "Content-Type",
+                        "Accept",
+                        "Origin"
+                ));
+
+                config.setExposedHeaders(List.of(
+                        "Authorization"
+                ));
+
                 config.setAllowCredentials(true);
 
                 return config;
