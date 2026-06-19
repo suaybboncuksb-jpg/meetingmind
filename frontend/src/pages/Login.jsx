@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import api from '../api/client.js'
 import { setAuthSession } from '../auth/authStorage.js'
+import ErrorAlert from '../components/ui/ErrorAlert.jsx'
 import Logo from '../components/Logo'
+import { getApiErrorMessage } from '../lib/apiErrors.js'
 
 const FEATURES = [
   'KI-Zusammenfassungen aus Protokollen',
@@ -51,10 +53,10 @@ export default function Login({ setIsAuthenticated }) {
       setAuthSession(response.data.token, response.data.user)
       setIsAuthenticated(true)
     } catch (err) {
-      setError(
-        err.response?.data?.message ||
-          'Anmeldung fehlgeschlagen. Bitte überprüfe deine Eingaben.',
-      )
+      setError(getApiErrorMessage(
+        err,
+        'Anmeldung fehlgeschlagen. Bitte überprüfe deine Eingaben.',
+      ))
     } finally {
       setLoading(false)
     }
@@ -172,14 +174,9 @@ export default function Login({ setIsAuthenticated }) {
               ))}
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700"
-              >
-                {error}
-              </div>
-            )}
+            <div className="mb-5">
+              <ErrorAlert message={error} />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLogin && (

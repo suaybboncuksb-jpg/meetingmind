@@ -8,6 +8,12 @@ const api = axios.create({
   baseURL: API_BASE_URL,
 })
 
+const AUTH_ENDPOINTS = ['/auth/login', '/auth/register']
+
+function isAuthEndpoint(url = '') {
+  return AUTH_ENDPOINTS.some((endpoint) => url.endsWith(endpoint))
+}
+
 api.interceptors.request.use((config) => {
   const token = getAuthToken()
 
@@ -23,7 +29,7 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status
 
-    if (status === 401 || status === 403) {
+    if ((status === 401 || status === 403) && !isAuthEndpoint(error.config?.url)) {
       clearAuthSession()
       window.dispatchEvent(
         new CustomEvent('auth:logout', {

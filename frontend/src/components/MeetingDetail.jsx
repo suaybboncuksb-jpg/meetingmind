@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import api from '../api/client.js'
 import Button from './ui/Button.jsx'
+import ErrorAlert from './ui/ErrorAlert.jsx'
 import StatusBadge from './ui/StatusBadge.jsx'
 import { XIcon, SparklesIcon } from './icons.jsx'
 import { formatDate, meetingDateOf } from '../lib/meetings.js'
+import { getApiErrorMessage } from '../lib/apiErrors.js'
 
 
 /** Labeled Section mit Inhalt oder ruhigem Empty-State. */
@@ -35,10 +37,10 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
     setAnalyzing(true)
     setError('')
     try {
-      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript })
+      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript: transcript.trim() })
       onUpdated(res.data)
     } catch (err) {
-      setError(err.response?.data?.message || 'Analyse fehlgeschlagen.')
+      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen.'))
     } finally {
       setAnalyzing(false)
     }
@@ -95,7 +97,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
               placeholder="Füge hier das Meeting-Protokoll oder Transkript ein…"
               className="mt-3 min-h-[140px] w-full resize-y rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/12"
             />
-            {error && <p className="mt-2 text-[13px] text-red-600">{error}</p>}
+            <div className="mt-3"><ErrorAlert message={error} /></div>
             <div className="mt-3 flex justify-end">
               <Button icon={SparklesIcon} onClick={handleAnalyze} disabled={analyzing}>
                 {analyzing ? 'Analysiere…' : 'KI-Analyse starten'}

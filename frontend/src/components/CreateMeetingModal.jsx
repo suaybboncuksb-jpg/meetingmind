@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import api from '../api/client.js'
 import Button from './ui/Button.jsx'
+import ErrorAlert from './ui/ErrorAlert.jsx'
 import { XIcon } from './icons.jsx'
+import { getApiErrorMessage } from '../lib/apiErrors.js'
 
 const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
@@ -19,11 +21,23 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
     setSaving(true)
     setError('')
 
+    const cleanTitle = title.trim()
+    const cleanDescription = description.trim()
+
+    if (!cleanTitle) {
+      setError('Meeting-Titel darf nicht leer sein.')
+      setSaving(false)
+      return
+    }
+
     try {
-      const res = await api.post('/meetings', { title, description })
+      const res = await api.post('/meetings', {
+        title: cleanTitle,
+        description: cleanDescription || null,
+      })
       onCreated(res.data)
     } catch (err) {
-      setError(err.response?.data?.message || 'Meeting konnte nicht erstellt werden.')
+      setError(getApiErrorMessage(err, 'Meeting konnte nicht erstellt werden.'))
     } finally {
       setSaving(false)
     }
@@ -50,11 +64,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div role="alert" className="rounded-button border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
-              {error}
-            </div>
-          )}
+          <ErrorAlert message={error} />
           <div>
             <label htmlFor="m-title" className="mb-1.5 block text-[13px] font-medium text-ink">Titel</label>
             <input
