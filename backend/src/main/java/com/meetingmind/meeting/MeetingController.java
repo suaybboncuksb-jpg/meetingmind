@@ -35,11 +35,13 @@ public class MeetingController {
     @PostMapping("/{id}/analyze")
     public ResponseEntity<MeetingDto> analyzeMeeting(
             @PathVariable Long id,
-            @RequestBody Map<String, String> request) {
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
 
         String transcript = request.get("transcript");
+        Long userId = currentUserId(authentication);
 
-        Meeting meeting = meetingService.analyzeMeeting(id, transcript);
+        Meeting meeting = meetingService.analyzeMeeting(id, userId, transcript);
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
@@ -54,8 +56,10 @@ public class MeetingController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id) {
-        Meeting meeting = meetingService.getMeetingById(id);
+    public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id, Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        Meeting meeting = meetingService.getMeetingById(id, userId);
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 

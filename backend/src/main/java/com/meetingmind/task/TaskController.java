@@ -49,9 +49,16 @@ public class TaskController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TaskDto> update(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<TaskDto> update(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body,
+            Authentication authentication) {
+
+        Long userId = currentUserId(authentication);
+
         return ResponseEntity.ok(taskService.update(
             id,
+            userId,
             (String) body.get("title"),
             (String) body.get("assignee"),
             (String) body.get("deadline"),
@@ -61,13 +68,21 @@ public class TaskController {
     }
 
     @PutMapping("/{id}/status")
-    public ResponseEntity<TaskDto> updateStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
-        return ResponseEntity.ok(taskService.updateStatus(id, body.get("status")));
+    public ResponseEntity<TaskDto> updateStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
+
+        Long userId = currentUserId(authentication);
+
+        return ResponseEntity.ok(taskService.updateStatus(id, userId, body.get("status")));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        taskService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        taskService.delete(id, userId);
         return ResponseEntity.noContent().build();
     }
 

@@ -1,7 +1,9 @@
 package com.meetingmind.meeting;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import com.meetingmind.user.User;
 import com.meetingmind.user.UserRepository;
 import com.meetingmind.transcript.Transcript;
@@ -9,6 +11,7 @@ import com.meetingmind.transcript.TranscriptRepository;
 import com.meetingmind.ai.MistralService;
 import com.meetingmind.ai.MistralAnalysisResult;
 import com.meetingmind.task.TaskService;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -32,7 +35,7 @@ public class MeetingService {
 
     public Meeting createMeeting(String title, String description, Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Meeting meeting = new Meeting();
         meeting.setTitle(title);
@@ -44,9 +47,8 @@ public class MeetingService {
         return meetingRepository.save(meeting);
     }
 
-    public Meeting analyzeMeeting(Long meetingId, String transcript) {
-        Meeting meeting = meetingRepository.findById(meetingId)
-            .orElseThrow(() -> new RuntimeException("Meeting not found"));
+    public Meeting analyzeMeeting(Long meetingId, Long userId, String transcript) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
 
         meeting.setStatus("ANALYZING");
         meeting.setTranscript(transcript);
@@ -83,12 +85,17 @@ public class MeetingService {
 
     public List<Meeting> getUserMeetings(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
         return meetingRepository.findByCreatedByOrderByMeetingDateDesc(user);
     }
 
-    public Meeting getMeetingById(Long meetingId) {
-        return meetingRepository.findById(meetingId)
-            .orElseThrow(() -> new RuntimeException("Meeting not found"));
+    public Meeting getMeetingById(Long meetingId, Long userId) {
+        return getOwnedMeeting(meetingId, userId);
+    }
+
+    private Meeting getOwnedMeeting(Long meetingId, Long userId) {
+        return meetingRepository.findByIdAndCreatedBy_Id(meetingId, userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));
     }
 }

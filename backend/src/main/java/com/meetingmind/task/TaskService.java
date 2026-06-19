@@ -1,7 +1,9 @@
 package com.meetingmind.task;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 import com.meetingmind.user.User;
 import com.meetingmind.user.UserRepository;
 import com.meetingmind.meeting.Meeting;
@@ -30,7 +32,8 @@ public class TaskService {
     @Transactional(readOnly = true)
     public List<TaskDto> getUserTasks(Long userId) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
         return taskRepository.findByOwnerOrderByCreatedAtDesc(user)
             .stream().map(TaskDto::from).toList();
     }
@@ -38,13 +41,18 @@ public class TaskService {
     public TaskDto create(Long userId, Long meetingId, String title, String assignee,
                           String deadline, String status, String priority) {
         User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Task task = new Task();
         task.setOwner(user);
+
         if (meetingId != null) {
-            meetingRepository.findById(meetingId).ifPresent(task::setMeeting);
+            Meeting meeting = meetingRepository.findByIdAndCreatedBy_Id(meetingId, userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));
+
+            task.setMeeting(meeting);
         }
+
         task.setTitle(title);
         task.setAssignee(emptyToNull(assignee));
         task.setDeadline(parseDate(deadline));
@@ -54,29 +62,33 @@ public class TaskService {
         return TaskDto.from(taskRepository.save(task));
     }
 
-    public TaskDto updateStatus(Long taskId, String status) {
-        Task task = taskRepository.findById(taskId)
-            .orElseThrow(() -> new RuntimeException("Task not found"));
+    public TaskDto updateStatus(Long taskId, Long userId, String status) {
+        Task task = getOwnedTask(taskId, userId);
+
         task.setStatus(status);
         task.setUpdatedAt(LocalDateTime.now());
+
         return TaskDto.from(taskRepository.save(task));
     }
 
-    public TaskDto update(Long taskId, String title, String assignee,
+    public TaskDto update(Long taskId, Long userId, String title, String assignee,
                           String deadline, String status, String priority) {
-        Task task = taskRepository.findById(taskId)
-            .orElseThrow(() -> new RuntimeException("Task not found"));
+        Task task = getOwnedTask(taskId, userId);
+
         if (title != null) task.setTitle(title);
         if (assignee != null) task.setAssignee(emptyToNull(assignee));
         if (deadline != null) task.setDeadline(parseDate(deadline));
         if (status != null && !status.isBlank()) task.setStatus(status);
         if (priority != null && !priority.isBlank()) task.setPriority(priority);
+
         task.setUpdatedAt(LocalDateTime.now());
+
         return TaskDto.from(taskRepository.save(task));
     }
 
-    public void delete(Long taskId) {
-        taskRepository.deleteById(taskId);
+    public void delete(Long taskId, Long userId) {
+        Task task = getOwnedTask(taskId, userId);
+        taskRepository.delete(task);
     }
 
     /** Erzeugt Aufgaben aus den strukturierten Action Items der KI-Analyse (idempotent pro Meeting). */
@@ -85,12 +97,14 @@ public class TaskService {
         if (meeting.getCreatedBy() == null) {
             return;
         }
+
         // Alte (KI-generierte) Aufgaben dieses Meetings entfernen, um Duplikate zu vermeiden
         taskRepository.deleteByMeeting(meeting);
 
         if (items == null || items.isEmpty()) {
             return;
         }
+
         for (ActionItem item : items) {
             if (item.title() == null || item.title().isBlank()) continue;
 
@@ -100,8 +114,14 @@ public class TaskService {
             task.setTitle(item.title().trim());
             task.setAssignee(emptyToNull(item.assignee()));
             task.setDeadline(parseDate(item.deadline()));
+
             taskRepository.save(task);
         }
+    }
+
+    private Task getOwnedTask(Long taskId, Long userId) {
+        return taskRepository.findByIdAndOwner_Id(taskId, userId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
     }
 
     private LocalDate parseDate(String value) {
