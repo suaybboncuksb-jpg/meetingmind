@@ -13,7 +13,11 @@ function Toggle({ checked, onChange }) {
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 rounded-full transition ${checked ? 'bg-navy' : 'bg-line'}`}
     >
-      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${checked ? 'left-[22px]' : 'left-0.5'}`} />
+      <span
+        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+          checked ? 'left-[22px]' : 'left-0.5'
+        }`}
+      />
     </button>
   )
 }
@@ -30,10 +34,27 @@ function Row({ title, description, children }) {
   )
 }
 
-const INTEGRATIONS = [
-  { name: 'Google Calendar', desc: 'Meetings automatisch synchronisieren.' },
-  { name: 'Zoom', desc: 'Aufzeichnungen & Transkripte importieren.' },
-  { name: 'Microsoft Teams', desc: 'Meetings und Protokolle verbinden.' },
+function RoadmapBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-line bg-soft px-2.5 py-1 text-[11px] font-medium text-muted">
+      Roadmap
+    </span>
+  )
+}
+
+const ROADMAP_INTEGRATIONS = [
+  {
+    name: 'Kalender-Integration',
+    desc: 'Geplant: Meetings später mit externen Kalendern synchronisieren.',
+  },
+  {
+    name: 'Video-Meeting-Import',
+    desc: 'Geplant: Aufzeichnungen und Transkripte aus Meeting-Tools importieren.',
+  },
+  {
+    name: 'Team-Workspace',
+    desc: 'Geplant: gemeinsame Arbeitsbereiche für mehrere Nutzer und Rollen.',
+  },
 ]
 
 export default function Settings({ user, theme = 'light', onThemeChange }) {
@@ -46,10 +67,12 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Einstellungen" subtitle="Verwalte dein Profil, Präferenzen und Integrationen." />
+      <PageHeader
+        title="Einstellungen"
+        subtitle="Verwalte dein Profil, deine Oberfläche und geplante Erweiterungen."
+      />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Profil */}
         <DataCard title="Profil" icon={UserIcon}>
           <div className="flex items-center gap-4">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-navy text-[16px] font-semibold text-white">
@@ -62,7 +85,6 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
           </div>
         </DataCard>
 
-        {/* Sprache & Design */}
         <DataCard title="Sprache & Darstellung" icon={GlobeIcon}>
           <div className="divide-y divide-line">
             <Row title="Sprache" description="Sprache der Oberfläche.">
@@ -82,26 +104,34 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
           </div>
         </DataCard>
 
-        {/* Benachrichtigungen */}
         <DataCard title="Benachrichtigungen" icon={BellIcon}>
           <div className="divide-y divide-line">
-            <Row title="E-Mail-Benachrichtigungen" description="Zusammenfassungen nach jedem Meeting.">
+            <Row
+              title="E-Mail-Benachrichtigungen"
+              description="Lokale Einstellung für spätere Meeting-Zusammenfassungen."
+            >
               <Toggle checked={emailNotif} onChange={setEmailNotif} />
             </Row>
-            <Row title="Aufgaben-Erinnerungen" description="Hinweise zu fälligen Aufgaben.">
+            <Row
+              title="Aufgaben-Erinnerungen"
+              description="Lokale Einstellung für spätere Hinweise zu fälligen Aufgaben."
+            >
               <Toggle checked={taskNotif} onChange={setTaskNotif} />
             </Row>
           </div>
         </DataCard>
 
-        {/* Integrationen */}
-        <DataCard title="Integrationen" icon={PlugIcon}>
+        <DataCard title="Roadmap" icon={PlugIcon}>
+          <div className="mb-3 rounded-xl border border-line bg-canvas px-4 py-3">
+            <p className="text-[13px] leading-relaxed text-muted">
+              Diese Punkte sind als nächste Ausbaustufen geplant und aktuell noch nicht aktiv verbunden.
+            </p>
+          </div>
+
           <div className="divide-y divide-line">
-            {INTEGRATIONS.map((it) => (
+            {ROADMAP_INTEGRATIONS.map((it) => (
               <Row key={it.name} title={it.name} description={it.desc}>
-                <span className="inline-flex items-center rounded-full border border-line bg-soft px-2.5 py-1 text-[11px] font-medium text-muted">
-                  Bald verfügbar
-                </span>
+                <RoadmapBadge />
               </Row>
             ))}
           </div>

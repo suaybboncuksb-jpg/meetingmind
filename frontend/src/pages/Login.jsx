@@ -4,9 +4,9 @@ import { setAuthSession } from '../auth/authStorage.js'
 import Logo from '../components/Logo'
 
 const FEATURES = [
-  'Automatische Zusammenfassungen & Action Items',
-  'Aufgaben mit Zuweisung und Deadline',
-  'Team- und Kalenderübersicht auf einen Blick',
+  'KI-Zusammenfassungen aus Protokollen',
+  'Aufgaben mit Zuständigkeit und Deadline',
+  'Übersicht für Meetings, Tasks und Teamarbeit',
 ]
 
 function CheckIcon() {
@@ -86,12 +86,14 @@ export default function Login({ setIsAuthenticated }) {
             <span className="h-1.5 w-1.5 rounded-full bg-brand" />
             KI-Meeting-Management
           </span>
+
           <h1 className="mt-5 text-[40px] font-semibold leading-[1.1] tracking-tight text-white xl:text-[44px]">
-            Meetings, die zu<br />Ergebnissen führen.
+            Meetings, die zu<br />klaren Aufgaben werden.
           </h1>
+
           <p className="mt-5 text-[15px] leading-relaxed text-white/65">
-            MeetingMind verwandelt jedes Gespräch automatisch in klare Aufgaben,
-            Verantwortlichkeiten und Deadlines – nachvollziehbar für das gesamte Team.
+            MeetingMind hilft Teams dabei, Protokolle, Entscheidungen und Aufgaben
+            an einem Ort zu strukturieren – ohne manuelles Nacharbeiten in mehreren Tools.
           </p>
 
           <ul className="mt-9 space-y-3.5">
@@ -105,25 +107,29 @@ export default function Login({ setIsAuthenticated }) {
             ))}
           </ul>
 
-          <figure className="mt-10 rounded-2xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
-            <blockquote className="text-[14px] leading-relaxed text-white/85">
-              „Unsere Meetings enden nicht mehr ohne klares Ergebnis. Jede Aufgabe
-              hat einen Verantwortlichen und ein Datum.“
-            </blockquote>
-            <figcaption className="mt-4 flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-[13px] font-semibold text-white">
-                LK
-              </span>
-              <span className="text-[13px] leading-tight text-white/70">
-                <span className="block font-medium text-white/90">Lena Kraus</span>
-                Head of Operations, Northwind
-              </span>
-            </figcaption>
-          </figure>
+          <div className="mt-10 rounded-2xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-white/45">
+              Fokus im MVP
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3">
+                <p className="text-[20px] font-semibold text-white">1</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/60">
+                  zentraler Workspace für Meetings
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/10 bg-white/[0.06] p-3">
+                <p className="text-[20px] font-semibold text-white">KI</p>
+                <p className="mt-1 text-[12px] leading-relaxed text-white/60">
+                  Analyse für Zusammenfassung und Aufgaben
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <p className="relative text-xs text-white/40">
-          © {new Date().getFullYear()} MeetingMind · Sicher & DSGVO-konform
+          © {new Date().getFullYear()} MeetingMind · Sicherheit & Datenschutz im Fokus
         </p>
       </aside>
 
@@ -140,8 +146,8 @@ export default function Login({ setIsAuthenticated }) {
               </h2>
               <p className="mt-1.5 text-[14px] text-muted">
                 {isLogin
-                  ? 'Melde dich an, um auf dein Workspace zuzugreifen.'
-                  : 'Starte in wenigen Sekunden mit MeetingMind.'}
+                  ? 'Melde dich an, um auf deinen Workspace zuzugreifen.'
+                  : 'Erstelle deinen MeetingMind-Workspace in wenigen Sekunden.'}
               </p>
             </div>
 
@@ -187,7 +193,7 @@ export default function Login({ setIsAuthenticated }) {
                     name="name"
                     value={formData.name}
                     onChange={handleChange}
-                    placeholder="Max Mustermann"
+                    placeholder="Dein Name"
                     required={!isLogin}
                     autoComplete="name"
                     className={inputClass}
@@ -205,7 +211,7 @@ export default function Login({ setIsAuthenticated }) {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="du@unternehmen.de"
+                  placeholder="name@unternehmen.de"
                   required
                   autoComplete="email"
                   className={inputClass}
@@ -213,19 +219,9 @@ export default function Login({ setIsAuthenticated }) {
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label htmlFor="password" className="block text-[13px] font-medium text-ink">
-                    Passwort
-                  </label>
-                  {isLogin && (
-                    <button
-                      type="button"
-                      className="text-[13px] font-medium text-brand transition hover:text-brand-600"
-                    >
-                      Passwort vergessen?
-                    </button>
-                  )}
-                </div>
+                <label htmlFor="password" className="mb-1.5 block text-[13px] font-medium text-ink">
+                  Passwort
+                </label>
                 <input
                   id="password"
                   type="password"
