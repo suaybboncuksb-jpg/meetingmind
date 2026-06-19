@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import axios from 'axios'
+import api from './api/client.js'
+import {
+  clearAuthSession,
+  hasAuthToken,
+  readStoredUser,
+} from './auth/authStorage.js'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Meetings from './pages/Meetings.jsx'
@@ -9,16 +14,6 @@ import AppLayout from './components/AppLayout.jsx'
 import CreateMeetingModal from './components/CreateMeetingModal.jsx'
 import CreateTaskModal from './components/CreateTaskModal.jsx'
 import './index.css'
-
-const API = 'http://localhost:8080/api'
-
-function readUser() {
-  try {
-    return JSON.parse(localStorage.getItem('user')) || null
-  } catch {
-    return null
-  }
-}
 
 function readTheme() {
   return localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'
@@ -42,23 +37,39 @@ function App() {
     localStorage.setItem('theme', theme)
   }, [theme])
 
+  const handleLogout = useCallback(() => {
+    clearAuthSession()
+    setUser(null)
+    setIsAuthenticated(false)
+    setMeetings([])
+    setTasks([])
+    setPage('dashboard')
+    setShowCreate(false)
+    setShowCreateTask(false)
+    setLoadingMeetings(false)
+  }, [])
+
   useEffect(() => {
-    const token = localStorage.getItem('authToken')
-    if (token) {
+    if (hasAuthToken()) {
       setIsAuthenticated(true)
-      setUser(readUser())
+      setUser(readStoredUser())
     }
+
     setAuthLoading(false)
   }, [])
 
-  const loadMeetings = useCallback(async (uid) => {
-    if (!uid) {
-      setLoadingMeetings(false)
-      return
-    }
+  useEffect(() => {
+    const onUnauthorized = () => handleLogout()
+
+    window.addEventListener('auth:logout', onUnauthorized)
+    return () => window.removeEventListener('auth:logout', onUnauthorized)
+  }, [handleLogout])
+
+  const loadMeetings = useCallback(async () => {
     setLoadingMeetings(true)
+
     try {
-      const res = await axios.get(`${API}/meetings`, { params: { userId: uid } })
+      const res = await api.get('/meetings')
       setMeetings(Array.isArray(res.data) ? res.data : [])
     } catch {
       setMeetings([])
@@ -67,10 +78,9 @@ function App() {
     }
   }, [])
 
-  const loadTasks = useCallback(async (uid) => {
-    if (!uid) return
+  const loadTasks = useCallback(async () => {
     try {
-      const res = await axios.get(`${API}/tasks`, { params: { userId: uid } })
+      const res = await api.get('/tasks')
       setTasks(Array.isArray(res.data) ? res.data : [])
     } catch {
       setTasks([])
@@ -78,25 +88,20 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (isAuthenticated && user?.id) {
-      loadMeetings(user.id)
-      loadTasks(user.id)
+    if (isAuthenticated) {
+      loadMeetings()
+      loadTasks()
+    } else {
+      setLoadingMeetings(false)
     }
-  }, [isAuthenticated, user?.id, loadMeetings, loadTasks])
+  }, [isAuthenticated, loadMeetings, loadTasks])
 
   const handleLogin = (value) => {
     setIsAuthenticated(value)
-    if (value) setUser(readUser())
-  }
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('user')
-    setUser(null)
-    setIsAuthenticated(false)
-    setMeetings([])
-    setTasks([])
-    setPage('dashboard')
+    if (value) {
+      setUser(readStoredUser())
+    }
   }
 
   const handleCreated = (meeting) => {
@@ -106,8 +111,7 @@ function App() {
 
   const handleMeetingUpdated = (updated) => {
     setMeetings((prev) => prev.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)))
-    // Analyse kann Aufgaben erzeugt haben → neu laden
-    if (user?.id) loadTasks(user.id)
+    loadTasks()
   }
 
   const handleTaskCreated = (task) => {
@@ -117,10 +121,11 @@ function App() {
 
   const handleTaskStatus = async (taskId, status) => {
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status } : t)))
+
     try {
-      await axios.put(`${API}/tasks/${taskId}/status`, { status })
+      await api.put(`/tasks/${taskId}/status`, { status })
     } catch {
-      if (user?.id) loadTasks(user.id)
+      loadTasks()
     }
   }
 
@@ -175,12 +180,11 @@ function App() {
       </AppLayout>
 
       {showCreate && (
-        <CreateMeetingModal userId={user?.id} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
+        <CreateMeetingModal onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
 
       {showCreateTask && (
         <CreateTaskModal
-          userId={user?.id}
           meetings={meetings}
           onClose={() => setShowCreateTask(false)}
           onCreated={handleTaskCreated}

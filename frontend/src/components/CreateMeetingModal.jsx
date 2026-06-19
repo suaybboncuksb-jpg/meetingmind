@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import { XIcon } from './icons.jsx'
-
-const API = 'http://localhost:8080/api'
 
 const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
 /** Modal zum Anlegen eines Meetings (POST /api/meetings). */
-export default function CreateMeetingModal({ userId, onClose, onCreated }) {
+export default function CreateMeetingModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
@@ -20,8 +18,9 @@ export default function CreateMeetingModal({ userId, onClose, onCreated }) {
     e.preventDefault()
     setSaving(true)
     setError('')
+
     try {
-      const res = await axios.post(`${API}/meetings`, { title, description, userId })
+      const res = await api.post('/meetings', { title, description })
       onCreated(res.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Meeting konnte nicht erstellt werden.')

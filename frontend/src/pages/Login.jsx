@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api/client.js'
+import { setAuthSession } from '../auth/authStorage.js'
 import Logo from '../components/Logo'
 
 const FEATURES = [
@@ -42,13 +43,12 @@ export default function Login({ setIsAuthenticated }) {
     e.preventDefault()
     setLoading(true)
     setError('')
+
     try {
-      const endpoint = isLogin
-        ? 'http://localhost:8080/api/auth/login'
-        : 'http://localhost:8080/api/auth/register'
-      const response = await axios.post(endpoint, formData)
-      localStorage.setItem('authToken', response.data.token)
-      localStorage.setItem('user', JSON.stringify(response.data.user))
+      const endpoint = isLogin ? '/auth/login' : '/auth/register'
+      const response = await api.post(endpoint, formData)
+
+      setAuthSession(response.data.token, response.data.user)
       setIsAuthenticated(true)
     } catch (err) {
       setError(
@@ -67,9 +67,7 @@ export default function Login({ setIsAuthenticated }) {
 
   return (
     <div className="grid min-h-screen w-full lg:grid-cols-2">
-      {/* ---------------- Linke Seite: Navy-Hero ---------------- */}
       <aside className="relative hidden overflow-hidden bg-navy lg:flex lg:flex-col lg:justify-between lg:p-12 xl:p-14">
-        {/* ruhiger Hintergrund-Verlauf */}
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -107,7 +105,6 @@ export default function Login({ setIsAuthenticated }) {
             ))}
           </ul>
 
-          {/* Einziges Glass-/Milchglas-Element: dezente Trust-Card */}
           <figure className="mt-10 rounded-2xl border border-white/12 bg-white/[0.07] p-5 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.18)]">
             <blockquote className="text-[14px] leading-relaxed text-white/85">
               „Unsere Meetings enden nicht mehr ohne klares Ergebnis. Jede Aufgabe
@@ -130,7 +127,6 @@ export default function Login({ setIsAuthenticated }) {
         </p>
       </aside>
 
-      {/* ---------------- Rechte Seite: Auth-Card ---------------- */}
       <main className="flex items-center justify-center bg-canvas px-6 py-12">
         <div className="w-full max-w-[400px]">
           <div className="mb-8 flex justify-center lg:hidden">
@@ -149,7 +145,6 @@ export default function Login({ setIsAuthenticated }) {
               </p>
             </div>
 
-            {/* Tabs – Milchglas-Segmented-Control */}
             <div className="mb-6 grid grid-cols-2 gap-1 rounded-xl border border-line/70 bg-white/55 p-1 shadow-soft backdrop-blur-md dark:border-white/10 dark:bg-white/5">
               {[
                 { label: 'Anmelden', active: isLogin, onClick: () => switchMode(true) },

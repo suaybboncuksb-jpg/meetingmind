@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import StatusBadge from './ui/StatusBadge.jsx'
 import { XIcon, SparklesIcon } from './icons.jsx'
 import { formatDate, meetingDateOf } from '../lib/meetings.js'
 
-const API = 'http://localhost:8080/api'
 
 /** Labeled Section mit Inhalt oder ruhigem Empty-State. */
 function Section({ title, children, empty }) {
@@ -36,7 +35,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
     setAnalyzing(true)
     setError('')
     try {
-      const res = await axios.post(`${API}/meetings/${meeting.id}/analyze`, { transcript })
+      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript })
       onUpdated(res.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Analyse fehlgeschlagen.')

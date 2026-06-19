@@ -1,16 +1,14 @@
 import { useState } from 'react'
-import axios from 'axios'
+import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import { XIcon } from './icons.jsx'
-
-const API = 'http://localhost:8080/api'
 
 const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
 /** Modal zum manuellen Anlegen einer Aufgabe (POST /api/tasks). */
-export default function CreateTaskModal({ userId, meetings = [], onClose, onCreated }) {
+export default function CreateTaskModal({ meetings = [], onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -23,15 +21,16 @@ export default function CreateTaskModal({ userId, meetings = [], onClose, onCrea
     e.preventDefault()
     setSaving(true)
     setError('')
+
     try {
-      const res = await axios.post(`${API}/tasks`, {
-        userId,
+      const res = await api.post('/tasks', {
         title,
         assignee: assignee || null,
         deadline: deadline || null,
         priority,
         meetingId: meetingId ? Number(meetingId) : null,
       })
+
       onCreated(res.data)
     } catch (err) {
       setError(err.response?.data?.message || 'Aufgabe konnte nicht erstellt werden.')
