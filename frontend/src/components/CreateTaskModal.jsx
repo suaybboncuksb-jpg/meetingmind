@@ -1,0 +1,98 @@
+import { useState } from 'react'
+import axios from 'axios'
+import Button from './ui/Button.jsx'
+import { XIcon } from './icons.jsx'
+
+const API = 'http://localhost:8080/api'
+
+const inputClass =
+  'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
+  'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
+
+/** Modal zum manuellen Anlegen einer Aufgabe (POST /api/tasks). */
+export default function CreateTaskModal({ userId, meetings = [], onClose, onCreated }) {
+  const [title, setTitle] = useState('')
+  const [assignee, setAssignee] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [priority, setPriority] = useState('MEDIUM')
+  const [meetingId, setMeetingId] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      const res = await axios.post(`${API}/tasks`, {
+        userId,
+        title,
+        assignee: assignee || null,
+        deadline: deadline || null,
+        priority,
+        meetingId: meetingId ? Number(meetingId) : null,
+      })
+      onCreated(res.data)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Aufgabe konnte nicht erstellt werden.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-navy/40 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md rounded-card border border-line bg-surface p-6 shadow-card" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-[18px] font-semibold tracking-tight text-ink">Neue Aufgabe</h2>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-muted transition hover:bg-soft hover:text-ink" aria-label="Schließen">
+            <XIcon size={18} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div role="alert" className="rounded-button border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{error}</div>
+          )}
+          <div>
+            <label htmlFor="t-title" className="mb-1.5 block text-[13px] font-medium text-ink">Aufgabe</label>
+            <input id="t-title" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="z. B. Angebot finalisieren" required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="t-assignee" className="mb-1.5 block text-[13px] font-medium text-ink">Zuständig</label>
+              <input id="t-assignee" className={inputClass} value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Name" />
+            </div>
+            <div>
+              <label htmlFor="t-deadline" className="mb-1.5 block text-[13px] font-medium text-ink">Deadline</label>
+              <input id="t-deadline" type="date" className={inputClass} value={deadline} onChange={(e) => setDeadline(e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="t-priority" className="mb-1.5 block text-[13px] font-medium text-ink">Priorität</label>
+              <select id="t-priority" className={inputClass} value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <option value="LOW">Niedrig</option>
+                <option value="MEDIUM">Mittel</option>
+                <option value="HIGH">Hoch</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="t-meeting" className="mb-1.5 block text-[13px] font-medium text-ink">Meeting (optional)</label>
+              <select id="t-meeting" className={inputClass} value={meetingId} onChange={(e) => setMeetingId(e.target.value)}>
+                <option value="">— Keins —</option>
+                {meetings.map((m) => (
+                  <option key={m.id} value={m.id}>{m.title || 'Ohne Titel'}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button type="button" variant="secondary" onClick={onClose}>Abbrechen</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Wird erstellt…' : 'Erstellen'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

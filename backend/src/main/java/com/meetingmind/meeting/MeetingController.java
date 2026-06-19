@@ -1,0 +1,69 @@
+package com.meetingmind.meeting;
+
+import com.meetingmind.auth.AuthenticatedUser;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/meetings")
+@CrossOrigin(origins = "http://localhost:5173")
+public class MeetingController {
+
+    @Autowired
+    private MeetingService meetingService;
+
+    @PostMapping
+    public ResponseEntity<MeetingDto> createMeeting(
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+
+        String title = (String) request.get("title");
+        String description = (String) request.get("description");
+        Long userId = currentUserId(authentication);
+
+        Meeting meeting = meetingService.createMeeting(title, description, userId);
+        return ResponseEntity.ok(MeetingDto.from(meeting));
+    }
+
+    @PostMapping("/{id}/analyze")
+    public ResponseEntity<MeetingDto> analyzeMeeting(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+
+        String transcript = request.get("transcript");
+
+        Meeting meeting = meetingService.analyzeMeeting(id, transcript);
+        return ResponseEntity.ok(MeetingDto.from(meeting));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<MeetingDto>> getUserMeetings(Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        List<MeetingDto> meetings = meetingService.getUserMeetings(userId)
+            .stream().map(MeetingDto::from).toList();
+
+        return ResponseEntity.ok(meetings);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<MeetingDto> getMeeting(@PathVariable Long id) {
+        Meeting meeting = meetingService.getMeetingById(id);
+        return ResponseEntity.ok(MeetingDto.from(meeting));
+    }
+
+    private Long currentUserId(Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nicht authentifiziert.");
+        }
+
+        return user.id();
+    }
+}
