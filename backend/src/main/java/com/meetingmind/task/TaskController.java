@@ -95,12 +95,21 @@ public class TaskController {
     }
 
     private Long toLong(Object value) {
-        if (value == null) return null;
-        if (value instanceof Number n) return n.longValue();
+        if (value == null || value.toString().isBlank()) {
+            return null;
+        }
+
+        if (value instanceof Number n) {
+            return n.longValue();
+        }
+
         try {
             return Long.parseLong(value.toString());
         } catch (NumberFormatException e) {
-            return null;
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "meetingId muss eine gültige Zahl sein."
+            );
         }
     }
 }

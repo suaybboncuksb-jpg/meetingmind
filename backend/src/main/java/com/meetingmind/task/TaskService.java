@@ -13,9 +13,13 @@ import com.meetingmind.ai.ActionItem;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class TaskService {
+
+    private static final Set<String> ALLOWED_STATUSES = Set.of("OPEN", "IN_PROGRESS", "DONE");
+    private static final Set<String> ALLOWED_PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH");
 
     private final TaskRepository taskRepository;
     private final UserRepository userRepository;
@@ -53,11 +57,17 @@ public class TaskService {
             task.setMeeting(meeting);
         }
 
-        task.setTitle(title);
+        task.setTitle(requireText(title, "Task-Titel darf nicht leer sein."));
         task.setAssignee(emptyToNull(assignee));
         task.setDeadline(parseDate(deadline));
-        if (status != null && !status.isBlank()) task.setStatus(status);
-        if (priority != null && !priority.isBlank()) task.setPriority(priority);
+
+        if (status != null && !status.isBlank()) {
+            task.setStatus(normalizeStatus(status));
+        }
+
+        if (priority != null && !priority.isBlank()) {
+            task.setPriority(normalizePriority(priority));
+        }
 
         return TaskDto.from(taskRepository.save(task));
     }
@@ -65,7 +75,7 @@ public class TaskService {
     public TaskDto updateStatus(Long taskId, Long userId, String status) {
         Task task = getOwnedTask(taskId, userId);
 
-        task.setStatus(status);
+        task.setStatus(normalizeStatus(status));
         task.setUpdatedAt(LocalDateTime.now());
 
         return TaskDto.from(taskRepository.save(task));
@@ -75,11 +85,11 @@ public class TaskService {
                           String deadline, String status, String priority) {
         Task task = getOwnedTask(taskId, userId);
 
-        if (title != null) task.setTitle(title);
+        if (title != null) task.setTitle(requireText(title, "Task-Titel darf nicht leer sein."));
         if (assignee != null) task.setAssignee(emptyToNull(assignee));
         if (deadline != null) task.setDeadline(parseDate(deadline));
-        if (status != null && !status.isBlank()) task.setStatus(status);
-        if (priority != null && !priority.isBlank()) task.setPriority(priority);
+        if (status != null && !status.isBlank()) task.setStatus(normalizeStatus(status));
+        if (priority != null && !priority.isBlank()) task.setPriority(normalizePriority(priority));
 
         task.setUpdatedAt(LocalDateTime.now());
 
@@ -91,14 +101,12 @@ public class TaskService {
         taskRepository.delete(task);
     }
 
-    /** Erzeugt Aufgaben aus den strukturierten Action Items der KI-Analyse (idempotent pro Meeting). */
     @Transactional
     public void createFromActionItems(Meeting meeting, List<ActionItem> items) {
         if (meeting.getCreatedBy() == null) {
             return;
         }
 
-        // Alte (KI-generierte) Aufgaben dieses Meetings entfernen, um Duplikate zu vermeiden
         taskRepository.deleteByMeeting(meeting);
 
         if (items == null || items.isEmpty()) {
@@ -124,12 +132,50 @@ public class TaskService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));
     }
 
+    private String requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+
+        return value.trim();
+    }
+
+    private String normalizeStatus(String value) {
+        String normalized = requireText(value, "Status darf nicht leer sein.").toUpperCase();
+
+        if (!ALLOWED_STATUSES.contains(normalized)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Ungültiger Status. Erlaubt sind: OPEN, IN_PROGRESS, DONE."
+            );
+        }
+
+        return normalized;
+    }
+
+    private String normalizePriority(String value) {
+        String normalized = requireText(value, "Priorität darf nicht leer sein.").toUpperCase();
+
+        if (!ALLOWED_PRIORITIES.contains(normalized)) {
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Ungültige Priorität. Erlaubt sind: LOW, MEDIUM, HIGH."
+            );
+        }
+
+        return normalized;
+    }
+
     private LocalDate parseDate(String value) {
         if (value == null || value.isBlank()) return null;
+
         try {
             return LocalDate.parse(value.trim());
         } catch (Exception e) {
-            return null;
+            throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Ungültiges Deadline-Format. Bitte YYYY-MM-DD verwenden."
+            );
         }
     }
 

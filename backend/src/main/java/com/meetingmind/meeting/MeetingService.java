@@ -38,8 +38,8 @@ public class MeetingService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Meeting meeting = new Meeting();
-        meeting.setTitle(title);
-        meeting.setDescription(description);
+        meeting.setTitle(requireText(title, "Meeting-Titel darf nicht leer sein."));
+        meeting.setDescription(emptyToNull(description));
         meeting.setCreatedBy(user);
         meeting.setMeetingDate(LocalDateTime.now());
         meeting.setStatus("DRAFT");
@@ -49,19 +49,19 @@ public class MeetingService {
 
     public Meeting analyzeMeeting(Long meetingId, Long userId, String transcript) {
         Meeting meeting = getOwnedMeeting(meetingId, userId);
+        String cleanTranscript = requireText(transcript, "Transkript darf nicht leer sein.");
 
         meeting.setStatus("ANALYZING");
-        meeting.setTranscript(transcript);
+        meeting.setTranscript(cleanTranscript);
         meetingRepository.save(meeting);
 
         System.out.println("Starting Mistral analysis for meeting: " + meetingId);
-        MistralAnalysisResult analysisResult = mistralService.analyzeTranscript(transcript);
+        MistralAnalysisResult analysisResult = mistralService.analyzeTranscript(cleanTranscript);
 
-        // Idempotent: vorhandenes Transkript wiederverwenden (Unique pro Meeting)
         Transcript transcriptEntity = transcriptRepository.findByMeeting(meeting)
             .orElseGet(Transcript::new);
         transcriptEntity.setMeeting(meeting);
-        transcriptEntity.setOriginalText(transcript);
+        transcriptEntity.setOriginalText(cleanTranscript);
         transcriptEntity.setSummary(analysisResult.getSummary());
         transcriptEntity.setKeyPoints(analysisResult.getKeyPoints());
         transcriptEntity.setDecisions(analysisResult.getDecisions());
@@ -73,7 +73,6 @@ public class MeetingService {
 
         transcriptRepository.save(transcriptEntity);
 
-        // Aus den erkannten Action Items echte Aufgaben (inkl. Deadline) erzeugen
         taskService.createFromActionItems(meeting, analysisResult.getActionItemList());
 
         meeting.setStatus("ANALYZED");
@@ -97,5 +96,17 @@ public class MeetingService {
     private Meeting getOwnedMeeting(Long meetingId, Long userId) {
         return meetingRepository.findByIdAndCreatedBy_Id(meetingId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));
+    }
+
+    private String requireText(String value, String message) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+
+        return value.trim();
+    }
+
+    private String emptyToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value.trim();
     }
 }
