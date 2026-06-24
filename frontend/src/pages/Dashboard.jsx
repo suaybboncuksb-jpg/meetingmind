@@ -12,43 +12,183 @@ import {
 import { deriveStats, sortByDateDesc, formatDate, meetingDateOf } from '../lib/meetings.js'
 import {
   getUnassignedTasks,
+  isUnassignedTask,
   priorityLabel,
   getDeadlineRadarTasks,
   getDeadlineStats,
   deadlineLabel,
   deadlineBadgeClass,
   formatDeadline,
+  getDeadlineState,
 } from '../lib/tasks.js'
+
+function urgencyRank(task) {
+  const state = getDeadlineState(task)
+
+  const ranks = {
+    overdue: 0,
+    today: 1,
+    this_week: 2,
+    none: 3,
+    planned: 4,
+    done: 5,
+  }
+
+  return ranks[state] ?? 4
+}
+
+function byUrgencyThenDeadline(a, b) {
+  const rankDiff = urgencyRank(a) - urgencyRank(b)
+  if (rankDiff !== 0) return rankDiff
+
+  const dateA = a.deadline ? new Date(a.deadline).getTime() : Number.MAX_SAFE_INTEGER
+  const dateB = b.deadline ? new Date(b.deadline).getTime() : Number.MAX_SAFE_INTEGER
+
+  return dateA - dateB
+}
 
 export default function Dashboard({ user, meetings = [], tasks = [], loading, onNewMeeting, onNavigate }) {
   const stats = useMemo(() => deriveStats(meetings, tasks), [meetings, tasks])
   const recent = useMemo(() => sortByDateDesc(meetings).slice(0, 5), [meetings])
+
   const unassignedTasks = useMemo(() => getUnassignedTasks(tasks), [tasks])
-  const visibleUnassignedTasks = useMemo(() => unassignedTasks.slice(0, 5), [unassignedTasks])
+  const visibleUnassignedTasks = useMemo(() => unassignedTasks.slice(0, 4), [unassignedTasks])
+
   const deadlineRadarTasks = useMemo(() => getDeadlineRadarTasks(tasks), [tasks])
-  const visibleDeadlineRadarTasks = useMemo(() => deadlineRadarTasks.slice(0, 5), [deadlineRadarTasks])
+  const visibleDeadlineRadarTasks = useMemo(() => deadlineRadarTasks.slice(0, 4), [deadlineRadarTasks])
   const deadlineStats = useMemo(() => getDeadlineStats(tasks), [tasks])
+
+  const actionTasks = useMemo(() => (
+    [...tasks]
+      .filter((task) => task.status !== 'DONE')
+      .filter((task) => {
+        const state = getDeadlineState(task)
+        return state === 'overdue' || state === 'today' || isUnassignedTask(task)
+      })
+      .sort(byUrgencyThenDeadline)
+      .slice(0, 6)
+  ), [tasks])
+
+  const upcomingTasks = useMemo(() => (
+    [...tasks]
+      .filter((task) => task.status !== 'DONE')
+      .filter((task) => getDeadlineState(task) === 'this_week')
+      .sort(byUrgencyThenDeadline)
+      .slice(0, 4)
+  ), [tasks])
+
   const firstName = user?.firstName || 'zurück'
+
+  const actionHeadline = deadlineStats.overdue > 0
+    ? `${deadlineStats.overdue} überfällige Aufgabe(n)`
+    : deadlineStats.today > 0
+      ? `${deadlineStats.today} Aufgabe(n) heute fällig`
+      : unassignedTasks.length > 0
+        ? `${unassignedTasks.length} Aufgabe(n) ohne Zuständige`
+        : 'Alles im Griff'
+
+  const actionDescription = deadlineStats.overdue > 0
+    ? 'Diese Aufgaben sollten zuerst geprüft oder neu geplant werden.'
+    : deadlineStats.today > 0
+      ? 'Diese Aufgaben sind heute relevant und sollten priorisiert werden.'
+      : unassignedTasks.length > 0
+        ? 'Diese Aufgaben brauchen noch eine verantwortliche Person.'
+        : 'Aktuell gibt es keine kritischen Aufgaben im Arbeitsfokus.'
 
   return (
     <div className="space-y-7">
       <PageHeader
         title={`Guten Tag, ${firstName}`}
-        subtitle="Überblick über deine Meetings, Aufgaben und KI-Analysen."
+        subtitle="Dein Arbeitsfokus für Meetings, Aufgaben und Follow-ups."
         actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neues Meeting</Button>}
       />
 
       {/* KPI-Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={CalendarIcon} label="Meetings gesamt" value={stats.total} accent="bg-navy/5 text-navy" />
-        <StatCard icon={SparklesIcon} label="KI-analysiert" value={stats.analyzed} accent="bg-brand/10 text-brand" />
+        <StatCard icon={ClockIcon} label="Überfällig" value={deadlineStats.overdue} accent="bg-red-50 text-red-700" />
+        <StatCard icon={CalendarIcon} label="Heute fällig" value={deadlineStats.today} accent="bg-amber-50 text-amber-700" />
         <StatCard icon={CheckCircleIcon} label="Offene Aufgaben" value={stats.openTasks} accent="bg-soft text-muted" />
         <StatCard icon={ClockIcon} label="Ohne Zuständige" value={unassignedTasks.length} accent="bg-amber-50 text-amber-700" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Letzte Meetings */}
-        <div className="lg:col-span-2">
+        <div className="space-y-6 lg:col-span-2">
+          {/* Action Hub */}
+          <DataCard
+            title="Heute wichtig"
+            icon={CheckCircleIcon}
+            noPadding
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Aufgaben öffnen</Button>}
+          >
+            <div className="border-b border-line px-6 py-5">
+              <div className="rounded-card border border-line bg-canvas p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-[18px] font-semibold text-ink">{actionHeadline}</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-muted">{actionDescription}</p>
+                  </div>
+                  <Button size="sm" onClick={() => onNavigate('tasks')}>
+                    Jetzt prüfen
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {actionTasks.length === 0 ? (
+              <div className="px-6 py-8">
+                <div className="rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-[13px] font-semibold text-emerald-700">Keine akuten Aufgaben</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-emerald-700/75">
+                    Es gibt aktuell keine überfälligen, heute fälligen oder unzugeordneten Aufgaben.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {actionTasks.map((task) => (
+                  <li key={task.id} className="px-6 py-4 transition hover:bg-canvas">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-[14px] font-semibold text-ink">
+                            {task.title || 'Ohne Titel'}
+                          </p>
+                          {task.projectName ? (
+                            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                              {task.projectName}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <p className="mt-1 text-[12.5px] text-muted">
+                          {task.meetingTitle || 'Ohne Meeting'}
+                          {task.assignee ? ` · Zuständig: ${task.assignee}` : ' · Kein Verantwortlicher'}
+                        </p>
+
+                        <p className="mt-1 text-[12.5px] text-muted">
+                          Priorität: {priorityLabel(task.priority)}
+                          {task.deadline ? ` · Deadline: ${formatDeadline(task.deadline)}` : ' · Ohne Deadline'}
+                        </p>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <span className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deadlineBadgeClass(task)}`}>
+                          {deadlineLabel(task)}
+                        </span>
+                        {isUnassignedTask(task) ? (
+                          <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                            Ohne Zuständige
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DataCard>
+
+          {/* Letzte Meetings */}
           <DataCard
             title="Letzte Meetings"
             icon={ListIcon}
@@ -66,19 +206,26 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
               />
             ) : (
               <ul className="divide-y divide-line">
-                {recent.map((m) => (
-                  <li key={m.id} className="flex items-center gap-4 px-6 py-4 transition hover:bg-canvas">
+                {recent.map((meeting) => (
+                  <li key={meeting.id} className="flex items-center gap-4 px-6 py-4 transition hover:bg-canvas">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy/5 text-navy">
                       <FileTextIcon size={18} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-medium text-ink">{m.title || 'Ohne Titel'}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-[14px] font-medium text-ink">{meeting.title || 'Ohne Titel'}</p>
+                        {meeting.projectName ? (
+                          <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                            {meeting.projectName}
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="mt-0.5 truncate text-[12.5px] text-muted">
-                        {formatDate(meetingDateOf(m))}
-                        {m.description ? ` · ${m.description}` : ''}
+                        {formatDate(meetingDateOf(meeting))}
+                        {meeting.description ? ` · ${meeting.description}` : ''}
                       </p>
                     </div>
-                    <StatusBadge status={m.status} />
+                    <StatusBadge status={meeting.status} />
                   </li>
                 ))}
               </ul>
@@ -86,7 +233,6 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
           </DataCard>
         </div>
 
-        {/* Deadline-Radar und Aufgaben ohne Zuständige */}
         <aside className="flex flex-col gap-4">
           <DataCard
             title="Deadline-Radar"
@@ -139,15 +285,10 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                     </li>
                   ))}
                 </ul>
-
-                {deadlineRadarTasks.length > 5 && (
-                  <div className="border-t border-line px-6 py-3 text-[12.5px] text-muted">
-                    + {deadlineRadarTasks.length - 5} weitere kritische Aufgaben
-                  </div>
-                )}
               </div>
             )}
           </DataCard>
+
           <DataCard
             title="Ohne Zuständige"
             icon={ClockIcon}
@@ -174,13 +315,38 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                         </p>
                         <p className="mt-1 text-[12.5px] text-muted">
                           Priorität: {priorityLabel(task.priority)}
-                          {task.deadline ? ` · Deadline: ${task.deadline}` : ''}
+                          {task.deadline ? ` · Deadline: ${formatDeadline(task.deadline)}` : ''}
                         </p>
                       </div>
                       <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                         Offen
                       </span>
                     </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DataCard>
+
+          <DataCard title="Diese Woche" icon={CalendarIcon} noPadding>
+            {upcomingTasks.length === 0 ? (
+              <div className="px-6 py-8">
+                <div className="rounded-button border border-line bg-canvas px-4 py-3">
+                  <p className="text-[13px] font-semibold text-ink">Keine weiteren Wochenaufgaben</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                    Es gibt aktuell keine weiteren offenen Aufgaben mit Deadline in dieser Woche.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {upcomingTasks.map((task) => (
+                  <li key={task.id} className="px-6 py-4">
+                    <p className="truncate text-[14px] font-semibold text-ink">{task.title || 'Ohne Titel'}</p>
+                    <p className="mt-1 text-[12.5px] text-muted">
+                      {formatDeadline(task.deadline)}
+                      {task.projectName ? ` · ${task.projectName}` : ''}
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -197,7 +363,7 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
             </span>
             <h3 className="relative mt-4 text-[15px] font-semibold">Schnellaktionen</h3>
             <p className="relative mt-1.5 text-[13px] leading-relaxed text-white/70">
-              Lege ein Meeting an oder analysiere ein Protokoll mit KI.
+              Starte ein Meeting mit Vorlage oder prüfe deine Aufgaben.
             </p>
             <div className="relative mt-5 flex flex-col gap-2">
               <button
@@ -207,10 +373,10 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                 <PlusIcon size={16} /> Neues Meeting erstellen
               </button>
               <button
-                onClick={() => onNavigate('meetings')}
+                onClick={() => onNavigate('tasks')}
                 className="inline-flex items-center justify-center gap-2 rounded-button border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-semibold text-white backdrop-blur-md transition hover:bg-white/15"
               >
-                <SparklesIcon size={16} /> Protokoll analysieren
+                <CheckCircleIcon size={16} /> Aufgaben prüfen
               </button>
             </div>
           </div>
