@@ -99,6 +99,132 @@ public class MeetingService {
     }
 
 
+    public MeetingQualityScoreDto calculateQualityScore(Long meetingId, Long userId) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+        Transcript transcript = transcriptRepository.findByMeeting(meeting).orElse(null);
+        List<Task> tasks = taskRepository.findByMeetingOrderByCreatedAtAsc(meeting);
+
+        int score = 0;
+        java.util.List<String> strengths = new java.util.ArrayList<>();
+        java.util.List<String> warnings = new java.util.ArrayList<>();
+        java.util.List<String> recommendations = new java.util.ArrayList<>();
+
+        int taskCount = tasks != null ? tasks.size() : 0;
+        long assignedCount = tasks == null ? 0 : tasks.stream()
+            .filter(task -> hasText(task.getAssignee()))
+            .count();
+        long deadlineCount = tasks == null ? 0 : tasks.stream()
+            .filter(task -> task.getDeadline() != null)
+            .count();
+
+        boolean hasSummary = hasText(meeting.getAiSummary()) || hasText(transcript != null ? transcript.getSummary() : null);
+        boolean hasTasks = taskCount > 0;
+        boolean allAssigned = hasTasks && assignedCount == taskCount;
+        boolean allDeadlines = hasTasks && deadlineCount == taskCount;
+        boolean hasDecisions = hasText(transcript != null ? transcript.getDecisions() : null);
+        boolean hasNextSteps = hasText(transcript != null ? transcript.getNextSteps() : null);
+        boolean hasQuestions = hasText(transcript != null ? transcript.getQuestions() : null);
+
+        if (hasSummary) {
+            score += 20;
+            strengths.add("Eine KI-Zusammenfassung ist vorhanden.");
+        } else {
+            warnings.add("Es gibt noch keine verwertbare Zusammenfassung.");
+            recommendations.add("Meeting-Protokoll analysieren, damit eine Zusammenfassung entsteht.");
+        }
+
+        if (hasTasks) {
+            score += 20;
+            strengths.add(taskCount + " Aufgabe(n) wurden aus dem Meeting erkannt.");
+
+            score += (int) Math.round((assignedCount * 15.0) / taskCount);
+            score += (int) Math.round((deadlineCount * 15.0) / taskCount);
+
+            if (allAssigned) {
+                strengths.add("Alle Aufgaben haben einen Verantwortlichen.");
+            } else {
+                warnings.add((taskCount - assignedCount) + " Aufgabe(n) haben noch keinen Verantwortlichen.");
+                recommendations.add("Offene Verantwortlichkeiten direkt in der Aufgabenansicht zuweisen.");
+            }
+
+            if (allDeadlines) {
+                strengths.add("Alle Aufgaben haben eine Deadline.");
+            } else {
+                warnings.add((taskCount - deadlineCount) + " Aufgabe(n) haben noch keine Deadline.");
+                recommendations.add("Fehlende Deadlines ergänzen, damit das Deadline-Radar zuverlässig funktioniert.");
+            }
+        } else {
+            warnings.add("Es wurden keine Aufgaben erkannt.");
+            recommendations.add("Prüfen, ob aus dem Meeting konkrete To-dos abgeleitet werden sollten.");
+        }
+
+        if (hasDecisions) {
+            score += 15;
+            strengths.add("Entscheidungen wurden dokumentiert.");
+        } else {
+            warnings.add("Es wurden keine Entscheidungen erkannt.");
+            recommendations.add("Wichtige Entscheidungen im Protokoll klarer formulieren.");
+        }
+
+        if (hasNextSteps) {
+            score += 10;
+            strengths.add("Nächste Schritte sind dokumentiert.");
+        } else {
+            warnings.add("Nächste Schritte fehlen oder sind unklar.");
+            recommendations.add("Am Ende jedes Meetings klare nächste Schritte festhalten.");
+        }
+
+        if (hasQuestions) {
+            score += 5;
+            warnings.add("Es gibt offene Fragen, die nachverfolgt werden sollten.");
+            recommendations.add("Offene Fragen in konkrete Aufgaben oder Klärungspunkte überführen.");
+        } else {
+            score += 5;
+            strengths.add("Es wurden keine offenen Fragen erkannt.");
+        }
+
+        score = Math.max(0, Math.min(100, score));
+
+        java.util.List<MeetingQualityCheckDto> checks = java.util.List.of(
+            new MeetingQualityCheckDto("Zusammenfassung vorhanden", hasSummary,
+                hasSummary ? "Das Meeting hat eine verwertbare Zusammenfassung." : "Es fehlt eine klare Zusammenfassung."),
+            new MeetingQualityCheckDto("Aufgaben erkannt", hasTasks,
+                hasTasks ? taskCount + " Aufgabe(n) erkannt." : "Es wurden keine konkreten Aufgaben erkannt."),
+            new MeetingQualityCheckDto("Verantwortliche zugeordnet", allAssigned,
+                allAssigned ? "Alle Aufgaben sind Personen zugeordnet." : "Es fehlen noch Verantwortliche."),
+            new MeetingQualityCheckDto("Deadlines gesetzt", allDeadlines,
+                allDeadlines ? "Alle Aufgaben haben Deadlines." : "Es fehlen noch Deadlines."),
+            new MeetingQualityCheckDto("Entscheidungen dokumentiert", hasDecisions,
+                hasDecisions ? "Entscheidungen wurden festgehalten." : "Es fehlen dokumentierte Entscheidungen."),
+            new MeetingQualityCheckDto("Nächste Schritte klar", hasNextSteps,
+                hasNextSteps ? "Nächste Schritte sind vorhanden." : "Nächste Schritte sind unklar."),
+            new MeetingQualityCheckDto("Offene Fragen geklärt", !hasQuestions,
+                hasQuestions ? "Es gibt offene Fragen." : "Keine offenen Fragen erkannt.")
+        );
+
+        String nextBestAction = nextBestAction(
+            hasSummary,
+            hasTasks,
+            allAssigned,
+            allDeadlines,
+            hasDecisions,
+            hasNextSteps,
+            hasQuestions
+        );
+
+        return new MeetingQualityScoreDto(
+            score,
+            qualityLabel(score),
+            qualitySummary(score),
+            checks,
+            strengths,
+            warnings,
+            recommendations,
+            nextBestAction
+        );
+    }
+
+
     public FollowUpDto generateFollowUp(Long meetingId, Long userId) {
         Meeting meeting = getOwnedMeeting(meetingId, userId);
         Transcript transcript = transcriptRepository.findByMeeting(meeting).orElse(null);
@@ -195,6 +321,53 @@ public class MeetingService {
         }
 
         return "";
+    }
+
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String qualityLabel(int score) {
+        if (score >= 85) return "Sehr produktiv";
+        if (score >= 70) return "Gut strukturiert";
+        if (score >= 50) return "Verbesserbar";
+        return "Kritisch";
+    }
+
+    private String qualitySummary(int score) {
+        if (score >= 85) {
+            return "Dieses Meeting ist sehr gut dokumentiert und gut nachbereitbar.";
+        }
+
+        if (score >= 70) {
+            return "Dieses Meeting ist grundsätzlich gut strukturiert, hat aber noch einzelne Lücken.";
+        }
+
+        if (score >= 50) {
+            return "Dieses Meeting enthält verwertbare Informationen, benötigt aber klarere Verantwortlichkeiten, Deadlines oder Entscheidungen.";
+        }
+
+        return "Dieses Meeting ist schwer nachzubereiten. Es fehlen wichtige Informationen für Aufgaben, Entscheidungen oder nächste Schritte.";
+    }
+
+
+    private String nextBestAction(boolean hasSummary,
+                                  boolean hasTasks,
+                                  boolean allAssigned,
+                                  boolean allDeadlines,
+                                  boolean hasDecisions,
+                                  boolean hasNextSteps,
+                                  boolean hasQuestions) {
+        if (!hasSummary) return "Starte oder wiederhole die KI-Analyse, damit eine klare Zusammenfassung entsteht.";
+        if (!hasTasks) return "Leite konkrete Aufgaben aus dem Meeting ab.";
+        if (!allAssigned) return "Weise offene Aufgaben einer verantwortlichen Person zu.";
+        if (!allDeadlines) return "Ergänze Deadlines für offene Aufgaben.";
+        if (!hasDecisions) return "Dokumentiere die wichtigsten Entscheidungen aus dem Meeting.";
+        if (!hasNextSteps) return "Formuliere klare nächste Schritte.";
+        if (hasQuestions) return "Klär offene Fragen oder überführe sie in Aufgaben.";
+
+        return "Das Meeting ist gut nachbereitbar. Prüfe nur noch, ob alle Beteiligten informiert wurden.";
     }
 
     private String requireText(String value, String message) {

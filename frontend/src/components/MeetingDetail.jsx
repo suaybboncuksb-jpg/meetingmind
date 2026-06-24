@@ -29,6 +29,8 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [analyzing, setAnalyzing] = useState(false)
   const [followUp, setFollowUp] = useState(null)
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
+  const [qualityScore, setQualityScore] = useState(null)
+  const [loadingQualityScore, setLoadingQualityScore] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
 
@@ -61,6 +63,20 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
       setError(getApiErrorMessage(err, 'Follow-up konnte nicht erstellt werden.'))
     } finally {
       setLoadingFollowUp(false)
+    }
+  }
+
+  async function handleLoadQualityScore() {
+    setLoadingQualityScore(true)
+    setError('')
+
+    try {
+      const res = await api.get(`/meetings/${meeting.id}/quality-score`)
+      setQualityScore(res.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Meeting-Score konnte nicht geladen werden.'))
+    } finally {
+      setLoadingQualityScore(false)
     }
   }
 
@@ -117,6 +133,93 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
           </div>
 
           <Section title="Offene Fragen" empty="Wird nach der Analyse angezeigt." />
+
+          {/* Meeting-Qualitäts-Score */}
+          <div className="rounded-card border border-line bg-canvas p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Meeting-Qualitäts-Score
+                </h4>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Prüft, ob das Meeting klar dokumentiert und gut nachbereitbar ist.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleLoadQualityScore}
+                disabled={loadingQualityScore}
+              >
+                {loadingQualityScore ? 'Lädt…' : 'Score berechnen'}
+              </Button>
+            </div>
+
+            {qualityScore && (
+              <div className="mt-4 rounded-card border border-line bg-surface p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[14px] font-semibold text-ink">{qualityScore.label}</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                      {qualityScore.summary}
+                    </p>
+                  </div>
+
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-brand/20 bg-brand/10 text-brand">
+                    <div className="text-center">
+                      <p className="text-[22px] font-bold leading-none">{qualityScore.score}</p>
+                      <p className="mt-0.5 text-[11px] font-semibold">/ 100</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 h-2 overflow-hidden rounded-full bg-soft">
+                  <div
+                    className="h-full rounded-full bg-brand transition-all"
+                    style={{ width: `${qualityScore.score || 0}%` }}
+                  />
+                </div>
+
+                <div className="mt-5">
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">
+                    Meeting-Checkliste
+                  </p>
+
+                  <ul className="mt-3 divide-y divide-line rounded-button border border-line bg-canvas">
+                    {qualityScore.checks?.map((check, index) => (
+                      <li key={index} className="flex items-start gap-3 px-3.5 py-3">
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[12px] font-bold ${
+                            check.passed
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-700'
+                          }`}
+                        >
+                          {check.passed ? '✓' : '!'}
+                        </span>
+
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-semibold text-ink">{check.label}</p>
+                          <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">
+                            {check.detail}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {qualityScore.nextBestAction && (
+                  <div className="mt-4 rounded-button border border-blue-100 bg-blue-50 px-4 py-3">
+                    <p className="text-[13px] font-semibold text-brand">Nächste beste Aktion</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-brand/80">
+                      {qualityScore.nextBestAction}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Follow-up-Mail */}
           <div className="rounded-card border border-line bg-canvas p-5">
