@@ -16,6 +16,7 @@ import {
   getDeadlineState,
 } from '../lib/tasks.js'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
+import { matchesSearch } from '../lib/search.js'
 
 const STATUS_TABS = [
   { key: 'all', label: 'Alle' },
@@ -143,6 +144,7 @@ export default function Tasks({
 }) {
   const [status, setStatus] = useState('all')
   const [deadlineFilter, setDeadlineFilter] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [draft, setDraft] = useState({
     title: '',
@@ -163,10 +165,19 @@ export default function Tasks({
     () => tasks.filter((task) => {
       const matchesStatus = status === 'all' || task.status === status
       const matchesDeadline = deadlineFilter === 'all' || getDeadlineState(task) === deadlineFilter
+      const matchesQuery = matchesSearch(searchQuery, [
+        task.title,
+        task.meetingTitle,
+        task.projectName,
+        task.assignee,
+        task.status,
+        task.priority,
+        task.deadline,
+      ])
 
-      return matchesStatus && matchesDeadline
+      return matchesStatus && matchesDeadline && matchesQuery
     }),
-    [tasks, status, deadlineFilter],
+    [tasks, status, deadlineFilter, searchQuery],
   )
 
   const selectedTask = useMemo(
@@ -319,6 +330,19 @@ export default function Tasks({
       <div className="space-y-3">
         <Tabs tabs={STATUS_TABS} value={status} onChange={setStatus} />
 
+        <div className="rounded-card border border-line bg-surface p-4 shadow-soft">
+          <label htmlFor="task-search" className="mb-1.5 block text-[13px] font-medium text-ink">
+            Aufgaben durchsuchen
+          </label>
+          <input
+            id="task-search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Aufgaben durchsuchen nach Titel, Projekt/Kunde, Meeting, Zuständig oder Priorität…"
+            className="w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
+          />
+        </div>
+
         <div className="flex flex-wrap items-center gap-2">
           <span className="mr-1 text-[12.5px] font-semibold text-muted">Deadline-Fokus:</span>
           {DEADLINE_TABS.map((tab) => (
@@ -353,7 +377,7 @@ export default function Tasks({
           />
         ) : filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-[14px] text-muted">
-            Keine Aufgaben für diesen Filter.
+            {searchQuery ? 'Keine passenden Aufgaben gefunden.' : 'Keine Aufgaben für diesen Filter.'}
           </div>
         ) : (
           <div className="overflow-x-auto">

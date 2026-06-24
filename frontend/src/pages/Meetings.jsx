@@ -8,6 +8,7 @@ import Button from '../components/ui/Button.jsx'
 import MeetingDetail from '../components/MeetingDetail.jsx'
 import { PlusIcon, CalendarIcon, FileTextIcon, UsersIcon, CheckSquareIcon, ArrowRightIcon } from '../components/icons.jsx'
 import { formatDate, meetingDateOf, taskCountOf, sortByDateDesc } from '../lib/meetings.js'
+import { matchesSearch } from '../lib/search.js'
 
 const TABS = [
   { key: 'all', label: 'Alle Meetings' },
@@ -24,7 +25,14 @@ function MeetingRow({ meeting, onOpen }) {
         <FileTextIcon size={18} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[14px] font-medium text-ink">{meeting.title || 'Ohne Titel'}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="truncate text-[14px] font-medium text-ink">{meeting.title || 'Ohne Titel'}</p>
+          {meeting.projectName ? (
+            <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand">
+              {meeting.projectName}
+            </span>
+          ) : null}
+        </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted">
           <span className="inline-flex items-center gap-1.5"><CalendarIcon size={14} />{formatDate(meetingDateOf(meeting))}</span>
           <span className="inline-flex items-center gap-1.5"><UsersIcon size={14} />— Teilnehmer</span>
@@ -103,13 +111,23 @@ function CalendarView({ meetings, onOpen }) {
 
 export default function Meetings({ meetings = [], loading, onNewMeeting, onMeetingUpdated }) {
   const [tab, setTab] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
 
   const sorted = useMemo(() => sortByDateDesc(meetings), [meetings])
-  const drafts = useMemo(() => sorted.filter((m) => m.status === 'DRAFT'), [sorted])
+  const searchableMeetings = useMemo(
+    () => sorted.filter((meeting) => matchesSearch(searchQuery, [
+      meeting.title,
+      meeting.description,
+      meeting.projectName,
+      meeting.status,
+    ])),
+    [sorted, searchQuery],
+  )
+  const drafts = useMemo(() => searchableMeetings.filter((m) => m.status === 'DRAFT'), [searchableMeetings])
   const selected = meetings.find((m) => m.id === selectedId) || null
 
-  const list = tab === 'drafts' ? drafts : sorted
+  const list = tab === 'drafts' ? drafts : searchableMeetings
 
   return (
     <div className="space-y-6">
@@ -121,21 +139,34 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
 
       <Tabs tabs={TABS} value={tab} onChange={setTab} />
 
+      <div className="rounded-card border border-line bg-surface p-4 shadow-soft">
+        <label htmlFor="meeting-search" className="mb-1.5 block text-[13px] font-medium text-ink">
+          Meetings durchsuchen
+        </label>
+        <input
+          id="meeting-search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Suche nach Titel, Projekt/Kunde, Beschreibung oder Status…"
+          className="w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
+        />
+      </div>
+
       <DataCard noPadding>
         {loading ? (
           <div className="px-6 py-12 text-center text-[14px] text-muted">Wird geladen…</div>
         ) : tab === 'calendar' ? (
-          meetings.length === 0 ? (
+          searchableMeetings.length === 0 ? (
             <EmptyState icon={CalendarIcon} title="Noch keine Meetings" description="Erstelle ein Meeting, um es im Kalender zu sehen."
               action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>} />
           ) : (
-            <CalendarView meetings={meetings} onOpen={(m) => setSelectedId(m.id)} />
+            <CalendarView meetings={searchableMeetings} onOpen={(m) => setSelectedId(m.id)} />
           )
         ) : list.length === 0 ? (
           <EmptyState
             icon={tab === 'drafts' ? FileTextIcon : CalendarIcon}
-            title={tab === 'drafts' ? 'Keine Entwürfe' : 'Noch keine Meetings'}
-            description={tab === 'drafts' ? 'Entwürfe erscheinen hier, bis sie analysiert wurden.' : 'Erstelle dein erstes Meeting, um loszulegen.'}
+            title={searchQuery ? 'Keine passenden Meetings' : (tab === 'drafts' ? 'Keine Entwürfe' : 'Noch keine Meetings')}
+            description={searchQuery ? 'Passe deine Suche an oder entferne den Suchbegriff.' : (tab === 'drafts' ? 'Entwürfe erscheinen hier, bis sie analysiert wurden.' : 'Erstelle dein erstes Meeting, um loszulegen.')}
             action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>}
           />
         ) : (
