@@ -129,6 +129,60 @@ function App() {
     }
   }
 
+  const handleTaskAssigneeChange = async (taskId, assigneeName) => {
+    const cleanAssignee = String(assigneeName || '').trim()
+
+    if (!cleanAssignee) return
+
+    const previousTasks = tasks
+
+    setTasks((prev) => prev.map((t) => (
+      t.id === taskId ? { ...t, assignee: cleanAssignee } : t
+    )))
+
+    try {
+      const res = await api.put(`/tasks/${taskId}`, { assignee: cleanAssignee })
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...res.data } : t)))
+    } catch (err) {
+      setTasks(previousTasks)
+      loadTasks()
+      throw err
+    }
+  }
+
+  const handleTaskUpdate = async (taskId, changes) => {
+    const previousTasks = tasks
+
+    setTasks((prev) => prev.map((t) => (
+      t.id === taskId ? { ...t, ...changes } : t
+    )))
+
+    try {
+      const res = await api.put(`/tasks/${taskId}`, changes)
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...res.data } : t)))
+      return res.data
+    } catch (err) {
+      setTasks(previousTasks)
+      loadTasks()
+      throw err
+    }
+  }
+
+  const handleAssignTaskToMe = async (taskId) => {
+    const assigneeName = user?.firstName || user?.name || user?.email || 'Ich'
+
+    setTasks((prev) => prev.map((t) => (
+      t.id === taskId ? { ...t, assignee: assigneeName } : t
+    )))
+
+    try {
+      const res = await api.put(`/tasks/${taskId}`, { assignee: assigneeName })
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...res.data } : t)))
+    } catch {
+      loadTasks()
+    }
+  }
+
   if (authLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
@@ -164,8 +218,11 @@ function App() {
     ),
     tasks: (
       <Tasks
+        user={user}
         tasks={tasks}
         onStatusChange={handleTaskStatus}
+        onTaskAssigneeChange={handleTaskAssigneeChange}
+        onTaskUpdate={handleTaskUpdate}
         onNewTask={() => setShowCreateTask(true)}
         onNavigate={setPage}
       />

@@ -10,10 +10,13 @@ import {
   FileTextIcon, ListIcon, ArrowRightIcon,
 } from '../components/icons.jsx'
 import { deriveStats, sortByDateDesc, formatDate, meetingDateOf } from '../lib/meetings.js'
+import { getUnassignedTasks, priorityLabel } from '../lib/tasks.js'
 
 export default function Dashboard({ user, meetings = [], tasks = [], loading, onNewMeeting, onNavigate }) {
   const stats = useMemo(() => deriveStats(meetings, tasks), [meetings, tasks])
   const recent = useMemo(() => sortByDateDesc(meetings).slice(0, 5), [meetings])
+  const unassignedTasks = useMemo(() => getUnassignedTasks(tasks), [tasks])
+  const visibleUnassignedTasks = useMemo(() => unassignedTasks.slice(0, 5), [unassignedTasks])
   const firstName = user?.firstName || 'zurück'
 
   return (
@@ -29,13 +32,16 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
         <StatCard icon={CalendarIcon} label="Meetings gesamt" value={stats.total} accent="bg-navy/5 text-navy" />
         <StatCard icon={SparklesIcon} label="KI-analysiert" value={stats.analyzed} accent="bg-brand/10 text-brand" />
         <StatCard icon={CheckCircleIcon} label="Offene Aufgaben" value={stats.openTasks} accent="bg-soft text-muted" />
-        <StatCard icon={ClockIcon} label="Diese Woche" value={stats.thisWeek} accent="bg-emerald-50 text-emerald-600" />
+        <StatCard icon={ClockIcon} label="Ohne Zuständige" value={unassignedTasks.length} accent="bg-amber-50 text-amber-700" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Letzte Meetings */}
         <div className="lg:col-span-2">
-          <DataCard title="Letzte Meetings" icon={ListIcon} noPadding
+          <DataCard
+            title="Letzte Meetings"
+            icon={ListIcon}
+            noPadding
             action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('meetings')}>Alle ansehen</Button>}
           >
             {loading ? (
@@ -69,8 +75,47 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
           </DataCard>
         </div>
 
-        {/* Schnellaktionen */}
+        {/* Aufgaben ohne Zuständige */}
         <aside className="flex flex-col gap-4">
+          <DataCard
+            title="Ohne Zuständige"
+            icon={ClockIcon}
+            noPadding
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Prüfen</Button>}
+          >
+            {visibleUnassignedTasks.length === 0 ? (
+              <div className="px-6 py-8">
+                <div className="rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-[13px] font-semibold text-emerald-700">Alles zugeordnet</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-emerald-700/75">
+                    Aktuell gibt es keine offenen Aufgaben ohne zuständige Person.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ul className="divide-y divide-line">
+                {visibleUnassignedTasks.map((task) => (
+                  <li key={task.id} className="px-6 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[14px] font-semibold text-ink">
+                          {task.title || 'Ohne Titel'}
+                        </p>
+                        <p className="mt-1 text-[12.5px] text-muted">
+                          Priorität: {priorityLabel(task.priority)}
+                          {task.deadline ? ` · Deadline: ${task.deadline}` : ''}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                        Offen
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </DataCard>
+
           <div
             className="relative overflow-hidden rounded-card border border-white/12 p-6 text-white shadow-card"
             style={{ background: 'linear-gradient(160deg, #1b365d 0%, #0d2137 100%)' }}
