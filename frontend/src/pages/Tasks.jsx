@@ -7,7 +7,13 @@ import Button from '../components/ui/Button.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import ErrorAlert from '../components/ui/ErrorAlert.jsx'
 import { CheckSquareIcon, PlusIcon, SparklesIcon, XIcon } from '../components/icons.jsx'
-import { isUnassignedTask } from '../lib/tasks.js'
+import {
+  isUnassignedTask,
+  deadlineLabel,
+  deadlineBadgeClass,
+  formatDeadline,
+  getDeadlineState,
+} from '../lib/tasks.js'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
 
 const STATUS_TABS = [
@@ -15,6 +21,14 @@ const STATUS_TABS = [
   { key: 'OPEN', label: 'Offen' },
   { key: 'IN_PROGRESS', label: 'In Arbeit' },
   { key: 'DONE', label: 'Erledigt' },
+]
+
+const DEADLINE_TABS = [
+  { key: 'all', label: 'Alle Deadlines' },
+  { key: 'overdue', label: 'Überfällig' },
+  { key: 'today', label: 'Heute' },
+  { key: 'this_week', label: 'Diese Woche' },
+  { key: 'none', label: 'Ohne Deadline' },
 ]
 
 const PRIORITY = {
@@ -37,6 +51,70 @@ function PriorityBadge({ priority }) {
   )
 }
 
+function DeadlineBadge({ task }) {
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${deadlineBadgeClass(task)}`}>
+        {deadlineLabel(task)}
+      </span>
+      <span className="text-[12px] text-muted">{formatDeadline(task.deadline)}</span>
+    </div>
+  )
+}
+
+function DeadlineInsight({ task }) {
+  const state = getDeadlineState(task)
+
+  const insights = {
+    overdue: {
+      title: 'Diese Aufgabe ist überfällig',
+      description: 'Die Deadline wurde bereits überschritten. Diese Aufgabe sollte zeitnah geprüft oder neu geplant werden.',
+      className: 'border-red-100 bg-red-50 text-red-800',
+    },
+    today: {
+      title: 'Diese Aufgabe ist heute fällig',
+      description: 'Diese Aufgabe sollte heute erledigt oder aktiv neu priorisiert werden.',
+      className: 'border-amber-100 bg-amber-50 text-amber-800',
+    },
+    this_week: {
+      title: 'Diese Aufgabe ist diese Woche fällig',
+      description: 'Die Deadline liegt in den nächsten Tagen. Plane die Umsetzung rechtzeitig ein.',
+      className: 'border-blue-100 bg-blue-50 text-brand',
+    },
+    none: {
+      title: 'Keine Deadline eingetragen',
+      description: 'Ohne Deadline ist schwer erkennbar, wann diese Aufgabe erledigt werden soll.',
+      className: 'border-slate-200 bg-slate-50 text-slate-700',
+    },
+    planned: {
+      title: 'Deadline ist geplant',
+      description: 'Diese Aufgabe hat eine spätere Deadline und ist aktuell nicht kritisch.',
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    },
+    done: {
+      title: 'Aufgabe erledigt',
+      description: 'Diese Aufgabe ist abgeschlossen und wird im Deadline-Radar nicht mehr als kritisch bewertet.',
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    },
+  }
+
+  const insight = insights[state] || insights.planned
+
+  return (
+    <div className={`rounded-button border px-4 py-3 ${insight.className}`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[13px] font-semibold">{insight.title}</p>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deadlineBadgeClass(task)}`}>
+          {deadlineLabel(task)}
+        </span>
+      </div>
+      <p className="mt-1 text-[12.5px] leading-relaxed opacity-80">
+        {insight.description}
+      </p>
+    </div>
+  )
+}
+
 export default function Tasks({
   user,
   tasks = [],
@@ -47,6 +125,7 @@ export default function Tasks({
   onNavigate,
 }) {
   const [status, setStatus] = useState('all')
+  const [deadlineFilter, setDeadlineFilter] = useState('all')
   const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [draft, setDraft] = useState({
     title: '',
@@ -59,8 +138,13 @@ export default function Tasks({
   const [error, setError] = useState('')
 
   const filtered = useMemo(
-    () => (status === 'all' ? tasks : tasks.filter((task) => task.status === status)),
-    [tasks, status],
+    () => tasks.filter((task) => {
+      const matchesStatus = status === 'all' || task.status === status
+      const matchesDeadline = deadlineFilter === 'all' || getDeadlineState(task) === deadlineFilter
+
+      return matchesStatus && matchesDeadline
+    }),
+    [tasks, status, deadlineFilter],
   )
 
   const selectedTask = useMemo(
@@ -146,7 +230,27 @@ export default function Tasks({
         actions={<Button icon={PlusIcon} onClick={onNewTask}>Neue Aufgabe</Button>}
       />
 
-      <Tabs tabs={STATUS_TABS} value={status} onChange={setStatus} />
+      <div className="space-y-3">
+        <Tabs tabs={STATUS_TABS} value={status} onChange={setStatus} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[12.5px] font-semibold text-muted">Deadline-Fokus:</span>
+          {DEADLINE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setDeadlineFilter(tab.key)}
+              className={`rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition ${
+                deadlineFilter === tab.key
+                  ? 'bg-navy text-white shadow-soft'
+                  : 'border border-line bg-surface text-muted hover:bg-soft hover:text-ink'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <DataCard noPadding>
         {tasks.length === 0 ? (
@@ -162,7 +266,9 @@ export default function Tasks({
             }
           />
         ) : filtered.length === 0 ? (
-          <div className="px-6 py-12 text-center text-[14px] text-muted">Keine Aufgaben in diesem Status.</div>
+          <div className="px-6 py-12 text-center text-[14px] text-muted">
+            Keine Aufgaben für diesen Filter.
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[14px]">
@@ -198,7 +304,7 @@ export default function Tasks({
                           <span className="text-muted">{task.assignee || '—'}</span>
                         )}
                       </td>
-                      <td className="px-6 py-3 text-muted">{task.deadline || '—'}</td>
+                      <td className="px-6 py-3"><DeadlineBadge task={task} /></td>
                       <td className="px-6 py-3"><PriorityBadge priority={task.priority} /></td>
                       <td className="px-6 py-3" onClick={(event) => event.stopPropagation()}>
                         <select
@@ -275,6 +381,8 @@ export default function Tasks({
                   </div>
                 </dl>
               </div>
+
+              <DeadlineInsight task={selectedTask} />
 
               <div className="rounded-card border border-line bg-surface p-4">
                 <div className="flex items-start justify-between gap-4">

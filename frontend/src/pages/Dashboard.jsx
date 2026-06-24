@@ -10,13 +10,24 @@ import {
   FileTextIcon, ListIcon, ArrowRightIcon,
 } from '../components/icons.jsx'
 import { deriveStats, sortByDateDesc, formatDate, meetingDateOf } from '../lib/meetings.js'
-import { getUnassignedTasks, priorityLabel } from '../lib/tasks.js'
+import {
+  getUnassignedTasks,
+  priorityLabel,
+  getDeadlineRadarTasks,
+  getDeadlineStats,
+  deadlineLabel,
+  deadlineBadgeClass,
+  formatDeadline,
+} from '../lib/tasks.js'
 
 export default function Dashboard({ user, meetings = [], tasks = [], loading, onNewMeeting, onNavigate }) {
   const stats = useMemo(() => deriveStats(meetings, tasks), [meetings, tasks])
   const recent = useMemo(() => sortByDateDesc(meetings).slice(0, 5), [meetings])
   const unassignedTasks = useMemo(() => getUnassignedTasks(tasks), [tasks])
   const visibleUnassignedTasks = useMemo(() => unassignedTasks.slice(0, 5), [unassignedTasks])
+  const deadlineRadarTasks = useMemo(() => getDeadlineRadarTasks(tasks), [tasks])
+  const visibleDeadlineRadarTasks = useMemo(() => deadlineRadarTasks.slice(0, 5), [deadlineRadarTasks])
+  const deadlineStats = useMemo(() => getDeadlineStats(tasks), [tasks])
   const firstName = user?.firstName || 'zurück'
 
   return (
@@ -75,8 +86,68 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
           </DataCard>
         </div>
 
-        {/* Aufgaben ohne Zuständige */}
+        {/* Deadline-Radar und Aufgaben ohne Zuständige */}
         <aside className="flex flex-col gap-4">
+          <DataCard
+            title="Deadline-Radar"
+            icon={ClockIcon}
+            noPadding
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Prüfen</Button>}
+          >
+            {visibleDeadlineRadarTasks.length === 0 ? (
+              <div className="px-6 py-8">
+                <div className="rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
+                  <p className="text-[13px] font-semibold text-emerald-700">Keine kritischen Deadlines</p>
+                  <p className="mt-1 text-[12.5px] leading-relaxed text-emerald-700/75">
+                    Aktuell sind keine offenen Aufgaben überfällig oder kurzfristig fällig.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="grid grid-cols-3 gap-2 px-6 py-4">
+                  <div className="rounded-button bg-red-50 px-3 py-2 text-center">
+                    <p className="text-[16px] font-semibold text-red-700">{deadlineStats.overdue}</p>
+                    <p className="text-[11px] text-red-700/70">Überfällig</p>
+                  </div>
+                  <div className="rounded-button bg-amber-50 px-3 py-2 text-center">
+                    <p className="text-[16px] font-semibold text-amber-700">{deadlineStats.today}</p>
+                    <p className="text-[11px] text-amber-700/70">Heute</p>
+                  </div>
+                  <div className="rounded-button bg-blue-50 px-3 py-2 text-center">
+                    <p className="text-[16px] font-semibold text-brand">{deadlineStats.thisWeek}</p>
+                    <p className="text-[11px] text-brand/70">Woche</p>
+                  </div>
+                </div>
+
+                <ul className="divide-y divide-line">
+                  {visibleDeadlineRadarTasks.map((task) => (
+                    <li key={task.id} className="px-6 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[14px] font-semibold text-ink">
+                            {task.title || 'Ohne Titel'}
+                          </p>
+                          <p className="mt-1 text-[12.5px] text-muted">
+                            Deadline: {formatDeadline(task.deadline)}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deadlineBadgeClass(task)}`}>
+                          {deadlineLabel(task)}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
+                {deadlineRadarTasks.length > 5 && (
+                  <div className="border-t border-line px-6 py-3 text-[12.5px] text-muted">
+                    + {deadlineRadarTasks.length - 5} weitere kritische Aufgaben
+                  </div>
+                )}
+              </div>
+            )}
+          </DataCard>
           <DataCard
             title="Ohne Zuständige"
             icon={ClockIcon}
