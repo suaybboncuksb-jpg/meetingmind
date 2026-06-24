@@ -9,13 +9,64 @@ const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
+const MEETING_TEMPLATES = [
+  {
+    key: 'team',
+    label: 'Teammeeting',
+    title: 'Teammeeting',
+    description:
+      'Agenda:\n- Aktueller Stand im Team\n- Offene Aufgaben\n- Blocker oder Probleme\n- Entscheidungen\n- Nächste Schritte',
+  },
+  {
+    key: 'customer',
+    label: 'Kundenmeeting',
+    title: 'Kundenmeeting',
+    description:
+      'Agenda:\n- Anliegen des Kunden\n- Aktueller Projektstand\n- Offene Fragen\n- Vereinbarte Aufgaben\n- Nächster Termin / Follow-up',
+  },
+  {
+    key: 'sprint',
+    label: 'Sprint Planning',
+    title: 'Sprint Planning',
+    description:
+      'Agenda:\n- Ziel des Sprints\n- Geplante Aufgaben\n- Verantwortlichkeiten\n- Risiken / Abhängigkeiten\n- Definition of Done',
+  },
+  {
+    key: 'status',
+    label: 'Projektstatus',
+    title: 'Projektstatus',
+    description:
+      'Agenda:\n- Fortschritt seit dem letzten Termin\n- Erledigte Aufgaben\n- Offene Punkte\n- Risiken\n- Nächste Schritte',
+  },
+  {
+    key: 'sales',
+    label: 'Vertriebsgespräch',
+    title: 'Vertriebsgespräch',
+    description:
+      'Agenda:\n- Bedarf des Kunden\n- Aktuelle Situation\n- Angebot / Lösungsvorschlag\n- Einwände oder offene Fragen\n- Nächste Schritte',
+  },
+]
+
 /** Modal zum Anlegen eines Meetings (POST /api/meetings). */
 export default function CreateMeetingModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [projectName, setProjectName] = useState('')
+  const [selectedTemplate, setSelectedTemplate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  function applyTemplate(template) {
+    setSelectedTemplate(template.key)
+
+    if (!title.trim()) {
+      setTitle(template.title)
+    }
+
+    if (!description.trim()) {
+      setDescription(template.description)
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -52,11 +103,16 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-card border border-line bg-surface p-6 shadow-card"
+        className="flex max-h-[92vh] w-full max-w-xl flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[18px] font-semibold tracking-tight text-ink">Neues Meeting</h2>
+        <div className="flex items-center justify-between border-b border-line px-6 py-5">
+          <div>
+            <h2 className="text-[18px] font-semibold tracking-tight text-ink">Neues Meeting</h2>
+            <p className="mt-1 text-[13px] text-muted">
+              Wähle optional eine Vorlage, um schneller zu starten.
+            </p>
+          </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-muted transition hover:bg-soft hover:text-ink"
@@ -66,8 +122,32 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
           <ErrorAlert message={error} />
+
+          <div>
+            <label className="mb-2 block text-[13px] font-medium text-ink">
+              Meeting-Vorlage
+            </label>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {MEETING_TEMPLATES.map((template) => (
+                <button
+                  key={template.key}
+                  type="button"
+                  onClick={() => applyTemplate(template)}
+                  className={`rounded-button border px-3.5 py-3 text-left text-[13px] font-semibold transition ${
+                    selectedTemplate === template.key
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-line bg-surface text-ink hover:bg-soft'
+                  }`}
+                >
+                  {template.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <label htmlFor="m-title" className="mb-1.5 block text-[13px] font-medium text-ink">Titel</label>
             <input
@@ -79,6 +159,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
               required
             />
           </div>
+
           <div>
             <label htmlFor="m-project" className="mb-1.5 block text-[13px] font-medium text-ink">Projekt / Kunde (optional)</label>
             <input
@@ -89,17 +170,21 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
               placeholder="z. B. Müller GmbH oder Website-Relaunch"
             />
           </div>
+
           <div>
-            <label htmlFor="m-desc" className="mb-1.5 block text-[13px] font-medium text-ink">Beschreibung (optional)</label>
+            <label htmlFor="m-desc" className="mb-1.5 block text-[13px] font-medium text-ink">Beschreibung / Agenda (optional)</label>
             <textarea
               id="m-desc"
-              className={`${inputClass} min-h-[88px] resize-none`}
+              className={`${inputClass} min-h-[140px] resize-y`}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Worum geht es in diesem Meeting?"
             />
           </div>
-          <div className="flex justify-end gap-2 pt-1">
+
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-line bg-surface px-6 py-4">
             <Button type="button" variant="secondary" onClick={onClose}>Abbrechen</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Wird erstellt…' : 'Erstellen'}</Button>
           </div>
