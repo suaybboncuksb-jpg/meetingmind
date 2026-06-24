@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import api from '../api/client.js'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import DataCard from '../components/ui/DataCard.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
@@ -60,6 +61,22 @@ function DeadlineBadge({ task }) {
       <span className="text-[12px] text-muted">{formatDeadline(task.deadline)}</span>
     </div>
   )
+}
+
+function formatCommentDate(value) {
+  if (!value) return 'gerade eben'
+
+  try {
+    return new Date(value).toLocaleString('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return 'gerade eben'
+  }
 }
 
 function DeadlineInsight({ task }) {
@@ -136,6 +153,11 @@ export default function Tasks({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [comments, setComments] = useState([])
+  const [commentDraft, setCommentDraft] = useState('')
+  const [loadingComments, setLoadingComments] = useState(false)
+  const [postingComment, setPostingComment] = useState(false)
+  const [commentError, setCommentError] = useState('')
 
   const filtered = useMemo(
     () => tasks.filter((task) => {
@@ -176,6 +198,70 @@ export default function Tasks({
     })
     setError('')
   }, [selectedTask])
+
+  useEffect(() => {
+    if (!selectedTaskId) {
+      setComments([])
+      setCommentDraft('')
+      setCommentError('')
+      return
+    }
+
+    let cancelled = false
+
+    async function loadComments() {
+      setLoadingComments(true)
+      setCommentError('')
+
+      try {
+        const res = await api.get(`/tasks/${selectedTaskId}/comments`)
+
+        if (!cancelled) {
+          setComments(Array.isArray(res.data) ? res.data : [])
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setComments([])
+          setCommentError(getApiErrorMessage(err, 'Kommentare konnten nicht geladen werden.'))
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingComments(false)
+        }
+      }
+    }
+
+    loadComments()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedTaskId])
+
+  async function handleCreateComment(event) {
+    event.preventDefault()
+
+    if (!selectedTask || !commentDraft.trim()) {
+      setCommentError('Bitte einen Kommentar eingeben.')
+      return
+    }
+
+    setPostingComment(true)
+    setCommentError('')
+
+    try {
+      const res = await api.post(`/tasks/${selectedTask.id}/comments`, {
+        message: commentDraft.trim(),
+      })
+
+      setComments((prev) => [...prev, res.data])
+      setCommentDraft('')
+    } catch (err) {
+      setCommentError(getApiErrorMessage(err, 'Kommentar konnte nicht gespeichert werden.'))
+    } finally {
+      setPostingComment(false)
+    }
+  }
 
   async function handleSave(changes = null) {
     if (!selectedTask) return
@@ -493,6 +579,71 @@ export default function Tasks({
                     </Button>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-card border border-line bg-surface p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-[14px] font-semibold text-ink">Kommentare</h3>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                      Halte Rückfragen, Fortschritte und kurze Abstimmungen direkt an der Aufgabe fest.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+                    {comments.length}
+                  </span>
+                </div>
+
+                <div className="mt-4">
+                  <ErrorAlert message={commentError} />
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {loadingComments ? (
+                    <p className="text-[13px] text-muted">Kommentare werden geladen…</p>
+                  ) : comments.length === 0 ? (
+                    <div className="rounded-button border border-line bg-canvas px-4 py-3">
+                      <p className="text-[13px] font-semibold text-ink">Noch keine Kommentare</p>
+                      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                        Schreibe den ersten Kommentar zu dieser Aufgabe.
+                      </p>
+                    </div>
+                  ) : (
+                    <ul className="space-y-3">
+                      {comments.map((comment) => (
+                        <li key={comment.id} className="rounded-button border border-line bg-canvas px-4 py-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-semibold text-ink">
+                                {comment.authorName || comment.authorEmail || 'Unbekannt'}
+                              </p>
+                              <p className="mt-0.5 text-[11.5px] text-muted">
+                                {formatCommentDate(comment.createdAt)}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-ink">
+                            {comment.message}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <form onSubmit={handleCreateComment} className="mt-4 space-y-3">
+                  <textarea
+                    value={commentDraft}
+                    onChange={(event) => setCommentDraft(event.target.value)}
+                    placeholder="Kommentar schreiben..."
+                    className="min-h-[90px] w-full resize-y rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
+                  />
+                  <div className="flex justify-end">
+                    <Button type="submit" size="sm" disabled={postingComment}>
+                      {postingComment ? 'Sendet…' : 'Kommentar senden'}
+                    </Button>
+                  </div>
+                </form>
               </div>
             </div>
           </aside>
