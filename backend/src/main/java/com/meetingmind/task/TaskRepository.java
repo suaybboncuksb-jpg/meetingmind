@@ -12,5 +12,6 @@ import java.util.Optional;
 public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Task> findByOwnerOrderByCreatedAtDesc(User owner);
     Optional<Task> findByIdAndOwner_Id(Long id, Long ownerId);
+    List<Task> findByMeetingOrderByCreatedAtAsc(Meeting meeting);
     void deleteByMeeting(Meeting meeting);
 }

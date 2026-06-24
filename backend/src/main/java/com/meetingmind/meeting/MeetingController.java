@@ -63,6 +63,14 @@ public class MeetingController {
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
+
+    @GetMapping("/{id}/follow-up")
+    public ResponseEntity<FollowUpDto> getFollowUp(@PathVariable Long id, Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        return ResponseEntity.ok(meetingService.generateFollowUp(id, userId));
+    }
+
     private Long currentUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nicht authentifiziert.");

@@ -11,6 +11,8 @@ import com.meetingmind.transcript.TranscriptRepository;
 import com.meetingmind.ai.MistralService;
 import com.meetingmind.ai.MistralAnalysisResult;
 import com.meetingmind.task.TaskService;
+import com.meetingmind.task.Task;
+import com.meetingmind.task.TaskRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,6 +34,9 @@ public class MeetingService {
 
     @Autowired
     private TaskService taskService;
+
+    @Autowired
+    private TaskRepository taskRepository;
 
     public Meeting createMeeting(String title, String description, Long userId) {
         User user = userRepository.findById(userId)
@@ -93,9 +98,103 @@ public class MeetingService {
         return getOwnedMeeting(meetingId, userId);
     }
 
+
+    public FollowUpDto generateFollowUp(Long meetingId, Long userId) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+        Transcript transcript = transcriptRepository.findByMeeting(meeting).orElse(null);
+        List<Task> tasks = taskRepository.findByMeetingOrderByCreatedAtAsc(meeting);
+
+        String subject = "Follow-up zum Meeting: " + meeting.getTitle();
+
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hallo zusammen,\n\n");
+        body.append("hier ist das Follow-up zu unserem Meeting");
+        if (meeting.getTitle() != null && !meeting.getTitle().isBlank()) {
+            body.append(" „").append(meeting.getTitle()).append("“");
+        }
+        body.append(".\n\n");
+
+        appendSection(body, "Zusammenfassung", firstNonBlank(
+            transcript != null ? transcript.getSummary() : null,
+            meeting.getAiSummary(),
+            "Es liegt noch keine KI-Zusammenfassung vor."
+        ));
+
+        appendSection(body, "Entscheidungen", firstNonBlank(
+            transcript != null ? transcript.getDecisions() : null,
+            "Es wurden keine Entscheidungen erkannt."
+        ));
+
+        appendTasksSection(body, tasks);
+
+        appendSection(body, "Offene Fragen", firstNonBlank(
+            transcript != null ? transcript.getQuestions() : null,
+            "Es wurden keine offenen Fragen erkannt."
+        ));
+
+        appendSection(body, "Nächste Schritte", firstNonBlank(
+            transcript != null ? transcript.getNextSteps() : null,
+            "Die nächsten Schritte ergeben sich aus den oben genannten Aufgaben."
+        ));
+
+        body.append("Viele Grüße");
+
+        return new FollowUpDto(subject, body.toString());
+    }
+
     private Meeting getOwnedMeeting(Long meetingId, Long userId) {
         return meetingRepository.findByIdAndCreatedBy_Id(meetingId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));
+    }
+
+
+    private void appendSection(StringBuilder body, String title, String content) {
+        body.append(title).append(":\n");
+        body.append(content).append("\n\n");
+    }
+
+    private void appendTasksSection(StringBuilder body, List<Task> tasks) {
+        body.append("Aufgaben:\n");
+
+        if (tasks == null || tasks.isEmpty()) {
+            body.append("- Es wurden keine Aufgaben erkannt.\n\n");
+            return;
+        }
+
+        for (Task task : tasks) {
+            body.append("- ").append(task.getTitle());
+
+            if (task.getAssignee() != null && !task.getAssignee().isBlank()) {
+                body.append(" – Zuständig: ").append(task.getAssignee());
+            } else {
+                body.append(" – Zuständig: noch offen");
+            }
+
+            if (task.getDeadline() != null) {
+                body.append(" – Deadline: ").append(task.getDeadline());
+            } else {
+                body.append(" – Deadline: noch offen");
+            }
+
+            body.append("\n");
+        }
+
+        body.append("\n");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
+        }
+
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+
+        return "";
     }
 
     private String requireText(String value, String message) {

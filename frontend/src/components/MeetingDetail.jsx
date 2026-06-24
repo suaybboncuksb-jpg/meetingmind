@@ -27,6 +27,9 @@ function Section({ title, children, empty }) {
 export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [transcript, setTranscript] = useState(meeting.transcript || '')
   const [analyzing, setAnalyzing] = useState(false)
+  const [followUp, setFollowUp] = useState(null)
+  const [loadingFollowUp, setLoadingFollowUp] = useState(false)
+  const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
 
   async function handleAnalyze() {
@@ -43,6 +46,35 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
       setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen.'))
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+  async function handleGenerateFollowUp() {
+    setLoadingFollowUp(true)
+    setCopied(false)
+    setError('')
+
+    try {
+      const res = await api.get(`/meetings/${meeting.id}/follow-up`)
+      setFollowUp(res.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Follow-up konnte nicht erstellt werden.'))
+    } finally {
+      setLoadingFollowUp(false)
+    }
+  }
+
+  async function handleCopyFollowUp() {
+    if (!followUp) return
+
+    const text = `Betreff: ${followUp.subject}\n\n${followUp.body}`
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setError('Follow-up konnte nicht in die Zwischenablage kopiert werden.')
     }
   }
 
@@ -85,6 +117,52 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
           </div>
 
           <Section title="Offene Fragen" empty="Wird nach der Analyse angezeigt." />
+
+          {/* Follow-up-Mail */}
+          <div className="rounded-card border border-line bg-canvas p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Follow-up-Mail
+                </h4>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Erstelle einen professionellen Entwurf zur Nachbereitung dieses Meetings.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleGenerateFollowUp}
+                disabled={loadingFollowUp}
+              >
+                {loadingFollowUp ? 'Erstellt…' : 'Follow-up erstellen'}
+              </Button>
+            </div>
+
+            {followUp && (
+              <div className="mt-4 space-y-3 rounded-card border border-line bg-surface p-4">
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Betreff</p>
+                  <p className="mt-1 rounded-button border border-line bg-canvas px-3 py-2 text-[13px] font-medium text-ink">
+                    {followUp.subject}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Entwurf</p>
+                  <pre className="mt-1 max-h-80 overflow-auto whitespace-pre-wrap rounded-button border border-line bg-canvas px-3 py-3 text-[13px] leading-relaxed text-ink">
+                    {followUp.body}
+                  </pre>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button size="sm" onClick={handleCopyFollowUp}>
+                    {copied ? 'Kopiert ✅' : 'In Zwischenablage kopieren'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Protokoll / Transkript + Analyse */}
           <div className="rounded-card border border-line bg-canvas p-5">
