@@ -110,6 +110,11 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
               <StatusBadge status={meeting.status} />
             </div>
             <p className="mt-1 text-[13px] text-muted">{formatDate(meetingDateOf(meeting))}</p>
+            {meeting.projectName ? (
+              <p className="mt-2 inline-flex rounded-full bg-brand/10 px-2.5 py-1 text-[12px] font-semibold text-brand">
+                Projekt / Kunde: {meeting.projectName}
+              </p>
+            ) : null}
           </div>
           <button
             onClick={onClose}

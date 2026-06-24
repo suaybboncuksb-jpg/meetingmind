@@ -38,13 +38,14 @@ public class MeetingService {
     @Autowired
     private TaskRepository taskRepository;
 
-    public Meeting createMeeting(String title, String description, Long userId) {
+    public Meeting createMeeting(String title, String description, String projectName, Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         Meeting meeting = new Meeting();
         meeting.setTitle(requireText(title, "Meeting-Titel darf nicht leer sein."));
         meeting.setDescription(emptyToNull(description));
+        meeting.setProjectName(emptyToNull(projectName));
         meeting.setCreatedBy(user);
         meeting.setMeetingDate(LocalDateTime.now());
         meeting.setStatus("DRAFT");

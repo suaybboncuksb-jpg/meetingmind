@@ -380,7 +380,16 @@ export default function Tasks({
                       onClick={() => setSelectedTaskId(task.id)}
                     >
                       <td className="px-6 py-3 font-medium text-ink">{task.title}</td>
-                      <td className="px-6 py-3 text-muted">{task.meetingTitle || '—'}</td>
+                      <td className="px-6 py-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-muted">{task.meetingTitle || '—'}</span>
+                          {task.projectName ? (
+                            <span className="w-fit rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                              {task.projectName}
+                            </span>
+                          ) : null}
+                        </div>
+                      </td>
                       <td className="px-6 py-3">
                         {unassigned ? (
                           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">

@@ -26,9 +26,10 @@ public class MeetingController {
 
         String title = (String) request.get("title");
         String description = (String) request.get("description");
+        String projectName = (String) request.get("projectName");
         Long userId = currentUserId(authentication);
 
-        Meeting meeting = meetingService.createMeeting(title, description, userId);
+        Meeting meeting = meetingService.createMeeting(title, description, projectName, userId);
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 

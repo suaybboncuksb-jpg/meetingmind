@@ -13,6 +13,7 @@ const inputClass =
 export default function CreateMeetingModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [projectName, setProjectName] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -23,6 +24,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
 
     const cleanTitle = title.trim()
     const cleanDescription = description.trim()
+    const cleanProjectName = projectName.trim()
 
     if (!cleanTitle) {
       setError('Meeting-Titel darf nicht leer sein.')
@@ -34,6 +36,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
       const res = await api.post('/meetings', {
         title: cleanTitle,
         description: cleanDescription || null,
+        projectName: cleanProjectName || null,
       })
       onCreated(res.data)
     } catch (err) {
@@ -74,6 +77,16 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="z. B. Sprint Planning KW 25"
               required
+            />
+          </div>
+          <div>
+            <label htmlFor="m-project" className="mb-1.5 block text-[13px] font-medium text-ink">Projekt / Kunde (optional)</label>
+            <input
+              id="m-project"
+              className={inputClass}
+              value={projectName}
+              onChange={(e) => setProjectName(e.target.value)}
+              placeholder="z. B. Müller GmbH oder Website-Relaunch"
             />
           </div>
           <div>
