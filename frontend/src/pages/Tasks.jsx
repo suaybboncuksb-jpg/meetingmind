@@ -17,6 +17,11 @@ import {
 } from '../lib/tasks.js'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
 import { matchesSearch } from '../lib/search.js'
+import {
+  evaluateTaskQuality,
+  taskQualityBadgeClass,
+  taskQualityLabel,
+} from '../lib/taskQuality.js'
 
 const STATUS_TABS = [
   { key: 'all', label: 'Alle' },
@@ -60,6 +65,20 @@ function DeadlineBadge({ task }) {
         {deadlineLabel(task)}
       </span>
       <span className="text-[12px] text-muted">{formatDeadline(task.deadline)}</span>
+    </div>
+  )
+}
+
+
+function TaskQualityBadge({ task }) {
+  const quality = evaluateTaskQuality(task)
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${taskQualityBadgeClass(task)}`}>
+        {taskQualityLabel(task)}
+      </span>
+      <span className="text-[12px] text-muted">{quality.summary}</span>
     </div>
   )
 }
@@ -129,6 +148,69 @@ function DeadlineInsight({ task }) {
       <p className="mt-1 text-[12.5px] leading-relaxed opacity-80">
         {insight.description}
       </p>
+    </div>
+  )
+}
+
+
+function TaskQualityPanel({ task }) {
+  const quality = evaluateTaskQuality(task)
+  const progressClass = {
+    good: 'bg-emerald-500',
+    warning: 'bg-amber-500',
+    critical: 'bg-red-500',
+    done: 'bg-emerald-500',
+  }[quality.level] || 'bg-amber-500'
+
+  return (
+    <div className="rounded-card border border-line bg-surface p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-[14px] font-semibold text-ink">Aufgabenqualität</h3>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+            MeetingMind prüft, ob diese Aufgabe klar, zugeordnet und terminlich planbar ist.
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${taskQualityBadgeClass(task)}`}>
+          {quality.score} %
+        </span>
+      </div>
+
+      <div className="mt-4">
+        <div className="h-2 overflow-hidden rounded-full bg-soft">
+          <div
+            className={`h-full rounded-full ${progressClass}`}
+            style={{ width: `${quality.score}%` }}
+          />
+        </div>
+        <p className="mt-2 text-[12.5px] font-medium text-ink">{quality.label}</p>
+        <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{quality.summary}</p>
+      </div>
+
+      {quality.issues.length === 0 ? (
+        <div className="mt-4 rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
+          <p className="text-[13px] font-semibold text-emerald-700">Keine offenen Qualitätsprobleme</p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-emerald-700/75">
+            Diese Aufgabe ist aktuell gut genug beschrieben und nachverfolgbar.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {quality.issues.map((issue) => (
+            <div
+              key={`${issue.title}-${issue.description}`}
+              className={`rounded-button border px-4 py-3 ${
+                issue.severity === 'critical'
+                  ? 'border-red-100 bg-red-50 text-red-800'
+                  : 'border-amber-100 bg-amber-50 text-amber-800'
+              }`}
+            >
+              <p className="text-[13px] font-semibold">{issue.title}</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed opacity-80">{issue.description}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -390,12 +472,14 @@ export default function Tasks({
                   <th className="px-6 py-3">Deadline</th>
                   <th className="px-6 py-3">Priorität</th>
                   <th className="px-6 py-3">Status</th>
+                  <th className="px-6 py-3">Qualität</th>
                   <th className="px-6 py-3 text-right">Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {filtered.map((task) => {
                   const unassigned = isUnassignedTask(task) && task.status !== 'DONE'
+                  const quality = evaluateTaskQuality(task)
 
                   return (
                     <tr
@@ -435,6 +519,11 @@ export default function Tasks({
                           <option value="IN_PROGRESS">In Arbeit</option>
                           <option value="DONE">Erledigt</option>
                         </select>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${taskQualityBadgeClass(task)}`}>
+                          {quality.score} %
+                        </span>
                       </td>
                       <td className="px-6 py-3 text-right">
                         <button
@@ -502,6 +591,8 @@ export default function Tasks({
               </div>
 
               <DeadlineInsight task={selectedTask} />
+
+              <TaskQualityPanel task={selectedTask} />
 
               <div className="rounded-card border border-line bg-surface p-4">
                 <div className="flex items-start justify-between gap-4">
