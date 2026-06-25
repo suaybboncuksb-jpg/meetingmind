@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import ErrorAlert from './ui/ErrorAlert.jsx'
@@ -27,6 +27,41 @@ function Section({ title, children, empty }) {
 }
 
 
+
+
+function AnalysisResultList({ title, items = [], empty = 'Noch nichts erkannt.', tone = 'default' }) {
+  const toneClass = {
+    decision: 'border-emerald-100 bg-emerald-50 text-emerald-800',
+    question: 'border-amber-100 bg-amber-50 text-amber-800',
+    step: 'border-blue-100 bg-blue-50 text-brand',
+    default: 'border-line bg-canvas text-ink',
+  }[tone] || 'border-line bg-canvas text-ink'
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{title}</p>
+        <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+          {items.length}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="mt-2 rounded-button border border-line bg-canvas px-3 py-3 text-[12.5px] text-muted">
+          {empty}
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`} className={`rounded-button border px-3 py-3 text-[13px] leading-relaxed ${toneClass}`}>
+              {item}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 function PreviewList({ title, items = [], empty = 'Keine Einträge erkannt.' }) {
   return (
@@ -83,9 +118,42 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [analysisPreview, setAnalysisPreview] = useState(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
   const [applyingPreview, setApplyingPreview] = useState(false)
+  const [analysisDetails, setAnalysisDetails] = useState(null)
+  const [loadingAnalysisDetails, setLoadingAnalysisDetails] = useState(false)
 
   const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
   const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadAnalysisDetails() {
+      setLoadingAnalysisDetails(true)
+
+      try {
+        const res = await api.get(`/meetings/${meeting.id}/analysis`)
+
+        if (!cancelled) {
+          setAnalysisDetails(res.data)
+        }
+      } catch {
+        if (!cancelled) {
+          setAnalysisDetails(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAnalysisDetails(false)
+        }
+      }
+    }
+
+    loadAnalysisDetails()
+
+    return () => {
+      cancelled = true
+    }
+  }, [meeting.id, meeting.status, meeting.aiSummary])
+
 
   function handleCleanTranscript(reduceFillers = false) {
     if (!transcript.trim()) {
@@ -240,18 +308,69 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
         </div>
 
         <div className="space-y-7 px-6 py-6">
-          <Section title="KI-Zusammenfassung" empty="Noch keine Analyse vorhanden.">
-            {meeting.aiSummary ? <p>{meeting.aiSummary}</p> : null}
-          </Section>
+          {/* Analyse-Ergebnisse */}
+          <div className="rounded-card border border-line bg-canvas p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Analyse-Ergebnisse
+                </h4>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Entscheidungen, Aufgaben, offene Fragen und nächste Schritte aus der gespeicherten Meeting-Analyse.
+                </p>
+              </div>
 
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <Section title="Erkannte Aufgaben" empty="Wird nach der Analyse angezeigt." />
-            <Section title="Verantwortliche" empty="Wird nach der Analyse angezeigt." />
-            <Section title="Deadlines" empty="Wird nach der Analyse angezeigt." />
-            <Section title="Entscheidungen" empty="Wird nach der Analyse angezeigt." />
+              <span className="shrink-0 rounded-full border border-line bg-surface px-2.5 py-1 text-[11px] font-semibold text-muted">
+                {loadingAnalysisDetails ? 'Lädt…' : (analysisDetails?.analysisStatus || meeting.status || 'PENDING')}
+              </span>
+            </div>
+
+            <div className="mt-4 rounded-button border border-line bg-surface px-4 py-3">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">KI-Zusammenfassung</p>
+              {analysisDetails?.summary || meeting.aiSummary ? (
+                <p className="mt-2 text-[13px] leading-relaxed text-ink">
+                  {analysisDetails?.summary || meeting.aiSummary}
+                </p>
+              ) : (
+                <p className="mt-2 text-[12.5px] text-muted">Noch keine Analyse vorhanden.</p>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-4">
+              <AnalysisResultList
+                title="Entscheidungen"
+                items={analysisDetails?.decisions || []}
+                empty="Noch keine Entscheidungen dokumentiert."
+                tone="decision"
+              />
+
+              <AnalysisResultList
+                title="Offene Fragen"
+                items={analysisDetails?.questions || []}
+                empty="Keine offenen Fragen erkannt."
+                tone="question"
+              />
+
+              <AnalysisResultList
+                title="Nächste Schritte"
+                items={analysisDetails?.nextSteps || []}
+                empty="Noch keine nächsten Schritte erkannt."
+                tone="step"
+              />
+
+              <AnalysisResultList
+                title="Wichtige Punkte"
+                items={analysisDetails?.keyPoints || []}
+                empty="Noch keine wichtigen Punkte erkannt."
+              />
+
+              <AnalysisResultList
+                title="Erkannte Aufgaben aus Analyse"
+                items={analysisDetails?.actionItems || []}
+                empty="Noch keine Aufgaben aus der Analyse gespeichert."
+              />
+            </div>
           </div>
-
-          <Section title="Offene Fragen" empty="Wird nach der Analyse angezeigt." />
 
           {/* Meeting-Qualitäts-Score */}
           <div className="rounded-card border border-line bg-canvas p-5">

@@ -170,6 +170,15 @@ public class MeetingService {
         return meetingRepository.findByCreatedByOrderByMeetingDateDesc(user);
     }
 
+
+    public MeetingAnalysisDto getAnalysisDetails(Long meetingId, Long userId) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+
+        return transcriptRepository.findByMeeting(meeting)
+            .map(transcript -> MeetingAnalysisDto.from(meeting.getId(), transcript))
+            .orElseGet(() -> MeetingAnalysisDto.empty(meeting.getId()));
+    }
+
     public Meeting getMeetingById(Long meetingId, Long userId) {
         return getOwnedMeeting(meetingId, userId);
     }

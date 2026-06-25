@@ -91,6 +91,18 @@ public class MeetingController {
     }
 
 
+
+    @GetMapping("/{id}/analysis")
+    public ResponseEntity<MeetingAnalysisDto> getAnalysisDetails(
+            @PathVariable Long id,
+            Authentication authentication) {
+
+        Long userId = currentUserId(authentication);
+
+        return ResponseEntity.ok(meetingService.getAnalysisDetails(id, userId));
+    }
+
+
     @GetMapping("/{id}/follow-up")
     public ResponseEntity<FollowUpDto> getFollowUp(@PathVariable Long id, Authentication authentication) {
         Long userId = currentUserId(authentication);
