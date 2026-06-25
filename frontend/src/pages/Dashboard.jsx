@@ -21,6 +21,7 @@ import {
   formatDeadline,
   getDeadlineState,
 } from '../lib/tasks.js'
+import { createWorkBriefing } from '../lib/workBriefing.js'
 
 function urgencyRank(task) {
   const state = getDeadlineState(task)
@@ -47,6 +48,145 @@ function byUrgencyThenDeadline(a, b) {
   return dateA - dateB
 }
 
+
+function WorkBriefingCard({ briefing, onNavigate }) {
+  const tone = {
+    critical: {
+      className: 'border-red-100 bg-red-50 text-red-800',
+      badgeClass: 'bg-red-100 text-red-700',
+    },
+    warning: {
+      className: 'border-amber-100 bg-amber-50 text-amber-800',
+      badgeClass: 'bg-amber-100 text-amber-700',
+    },
+    info: {
+      className: 'border-blue-100 bg-blue-50 text-brand',
+      badgeClass: 'bg-blue-100 text-brand',
+    },
+    good: {
+      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+      badgeClass: 'bg-emerald-100 text-emerald-700',
+    },
+  }[briefing.status] || {
+    className: 'border-line bg-canvas text-ink',
+    badgeClass: 'bg-soft text-muted',
+  }
+
+  const sectionTitleClass = 'text-[13px] font-semibold text-ink'
+  const emptyTextClass = 'text-[12.5px] leading-relaxed text-muted'
+
+  return (
+    <DataCard
+      title="Tages- und Wochenbriefing"
+      icon={SparklesIcon}
+      noPadding
+      action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate(briefing.nextActionPage)}>{briefing.nextActionLabel}</Button>}
+    >
+      <div className="border-b border-line px-6 py-5">
+        <div className={`rounded-card border px-5 py-4 ${tone.className}`}>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[18px] font-semibold">{briefing.headline}</p>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.badgeClass}`}>
+                  {briefing.stats.criticalCount} kritisch
+                </span>
+              </div>
+              <p className="mt-1 text-[13px] leading-relaxed opacity-80">{briefing.summary}</p>
+            </div>
+
+            <Button size="sm" onClick={() => onNavigate(briefing.nextActionPage)}>
+              {briefing.nextActionLabel}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
+        <section className="px-6 py-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className={sectionTitleClass}>Heute / Akut</h3>
+            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+              {briefing.todayItems.length}
+            </span>
+          </div>
+
+          {briefing.todayItems.length === 0 ? (
+            <p className={emptyTextClass}>Keine akuten Aufgaben für heute.</p>
+          ) : (
+            <ul className="space-y-3">
+              {briefing.todayItems.map((item) => (
+                <li key={item.id} className="rounded-button border border-line bg-canvas px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 text-[13px] font-semibold text-ink">{item.title}</p>
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10.5px] font-semibold text-muted">
+                      {item.badge}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">{item.description}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="px-6 py-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className={sectionTitleClass}>Diese Woche</h3>
+            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+              {briefing.stats.thisWeek}
+            </span>
+          </div>
+
+          {briefing.weeklyItems.length === 0 ? (
+            <p className={emptyTextClass}>Keine weiteren Aufgaben mit Deadline in dieser Woche.</p>
+          ) : (
+            <ul className="space-y-3">
+              {briefing.weeklyItems.map((item) => (
+                <li key={item.id} className="rounded-button border border-line bg-surface px-4 py-3">
+                  <p className="text-[13px] font-semibold text-ink">{item.title}</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">{item.description}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="px-6 py-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className={sectionTitleClass}>Projektfokus</h3>
+            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+              {briefing.projectRisks.length}
+            </span>
+          </div>
+
+          {briefing.projectRisks.length === 0 ? (
+            <p className={emptyTextClass}>Keine kritischen Projektakten erkannt.</p>
+          ) : (
+            <ul className="space-y-3">
+              {briefing.projectRisks.map((project) => (
+                <li key={project.key} className="rounded-button border border-line bg-surface px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 text-[13px] font-semibold text-ink">{project.name}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                      project.criticalTasks > 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                    }`}>
+                      {project.criticalTasks > 0 ? `${project.criticalTasks} kritisch` : 'stabil'}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                    {project.openTasks} offene Aufgabe(n), {project.highPriorityTasks} mit hoher Priorität
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </DataCard>
+  )
+}
+
 export default function Dashboard({ user, meetings = [], tasks = [], loading, onNewMeeting, onNavigate }) {
   const stats = useMemo(() => deriveStats(meetings, tasks), [meetings, tasks])
   const recent = useMemo(() => sortByDateDesc(meetings).slice(0, 5), [meetings])
@@ -57,6 +197,7 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
   const deadlineRadarTasks = useMemo(() => getDeadlineRadarTasks(tasks), [tasks])
   const visibleDeadlineRadarTasks = useMemo(() => deadlineRadarTasks.slice(0, 4), [deadlineRadarTasks])
   const deadlineStats = useMemo(() => getDeadlineStats(tasks), [tasks])
+  const workBriefing = useMemo(() => createWorkBriefing(meetings, tasks), [meetings, tasks])
 
   const actionTasks = useMemo(() => (
     [...tasks]
@@ -102,6 +243,8 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
         subtitle="Dein Arbeitsfokus für Meetings, Aufgaben und Follow-ups."
         actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neues Meeting</Button>}
       />
+
+      <WorkBriefingCard briefing={workBriefing} onNavigate={onNavigate} />
 
       {/* KPI-Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
