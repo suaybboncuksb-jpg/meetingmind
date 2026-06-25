@@ -1,10 +1,11 @@
 import Logo from './Logo.jsx'
-import { HomeIcon, VideoIcon, CheckSquareIcon, SettingsIcon } from './icons.jsx'
+import { HomeIcon, VideoIcon, CheckSquareIcon, UsersIcon, SettingsIcon } from './icons.jsx'
 
 export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
   { key: 'meetings', label: 'Meetings', icon: VideoIcon },
   { key: 'tasks', label: 'Aufgaben', icon: CheckSquareIcon },
+  { key: 'projects', label: 'Projekte', icon: UsersIcon },
   { key: 'settings', label: 'Einstellungen', icon: SettingsIcon },
 ]
 

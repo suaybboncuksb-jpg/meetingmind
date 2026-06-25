@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Meetings from './pages/Meetings.jsx'
 import Tasks from './pages/Tasks.jsx'
+import Projects from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
 import AppLayout from './components/AppLayout.jsx'
 import CreateMeetingModal from './components/CreateMeetingModal.jsx'
@@ -224,6 +225,13 @@ function App() {
         onTaskAssigneeChange={handleTaskAssigneeChange}
         onTaskUpdate={handleTaskUpdate}
         onNewTask={() => setShowCreateTask(true)}
+        onNavigate={setPage}
+      />
+    ),
+    projects: (
+      <Projects
+        meetings={meetings}
+        tasks={tasks}
         onNavigate={setPage}
       />
     ),
