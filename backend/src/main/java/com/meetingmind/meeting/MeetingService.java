@@ -64,6 +64,19 @@ public class MeetingService {
         System.out.println("Starting Mistral analysis for meeting: " + meetingId);
         MistralAnalysisResult analysisResult = mistralService.analyzeTranscript(cleanTranscript);
 
+        if (!analysisResult.isSuccessful()) {
+            meeting.setStatus("ANALYSIS_FAILED");
+            meeting.setUpdatedAt(LocalDateTime.now());
+            meetingRepository.save(meeting);
+
+            String reason = analysisResult.getErrorMessage();
+            String message = reason == null || reason.isBlank()
+                ? "KI-Analyse fehlgeschlagen."
+                : "KI-Analyse fehlgeschlagen: " + reason;
+
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message);
+        }
+
         Transcript transcriptEntity = transcriptRepository.findByMeeting(meeting)
             .orElseGet(Transcript::new);
         transcriptEntity.setMeeting(meeting);

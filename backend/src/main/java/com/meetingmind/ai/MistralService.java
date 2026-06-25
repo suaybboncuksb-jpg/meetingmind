@@ -28,6 +28,10 @@ public class MistralService {
     private final ObjectMapper mapper = new ObjectMapper();
 
     public MistralAnalysisResult analyzeTranscript(String transcript) {
+        if (apiKey == null || apiKey.isBlank()) {
+            return createErrorResult("Mistral API-Key fehlt. Bitte MISTRAL_API_KEY setzen.");
+        }
+
         try {
             String response = callMistralAPI(transcript);
             return parseMistralResponse(response);
@@ -181,10 +185,18 @@ public class MistralService {
     }
 
     private MistralAnalysisResult createErrorResult(String reason) {
-        return new MistralAnalysisResult(
-            "Analyse fehlgeschlagen",
+        String cleanReason = reason == null || reason.isBlank()
+            ? "Unbekannter Analysefehler"
+            : reason;
+
+        MistralAnalysisResult result = new MistralAnalysisResult(
+            "",
             "", "", "", "", "",
-            reason == null ? "" : reason
+            cleanReason
         );
+
+        result.setSuccessful(false);
+        result.setErrorMessage(cleanReason);
+        return result;
     }
 }

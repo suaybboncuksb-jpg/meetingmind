@@ -79,7 +79,8 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
       const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript: preparedTranscript.trim() })
       onUpdated(res.data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen.'))
+      onUpdated?.({ ...meeting, status: 'ANALYSIS_FAILED' })
+      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen. Bitte prüfe API-Key, Transkript und KI-Verbindung.'))
     } finally {
       setAnalyzing(false)
     }

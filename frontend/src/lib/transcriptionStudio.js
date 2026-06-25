@@ -22,12 +22,12 @@ function removeFillerWords(line) {
 function normalizeSpeakerSyntax(line) {
   const trimmed = line.trim()
 
-  const dashSpeaker = trimmed.match(/^([A-Za-zÄÖÜäöüß .-]{2,32})\s[-–]\s(.+)$/)
+  const dashSpeaker = trimmed.match(/^([\p{L} .-]{2,32})\s[-–]\s(.+)$/u)
   if (dashSpeaker) {
     return `${dashSpeaker[1].trim()}: ${dashSpeaker[2].trim()}`
   }
 
-  const colonSpeaker = trimmed.match(/^([A-Za-zÄÖÜäöüß .-]{2,32})\s*:\s*(.+)$/)
+  const colonSpeaker = trimmed.match(/^([\p{L} .-]{2,32})\s*:\s*(.+)$/u)
   if (colonSpeaker) {
     return `${colonSpeaker[1].trim()}: ${colonSpeaker[2].trim()}`
   }
@@ -54,7 +54,7 @@ function normalizeLine(line, { reduceFillers = false } = {}) {
 }
 
 function isSpeakerLine(line) {
-  return /^[A-Za-zÄÖÜäöüß .-]{2,32}:\s+\S/.test(String(line || '').trim())
+  return /^[\p{L} .-]{2,32}:\s+\S/u.test(String(line || '').trim())
 }
 
 function extractSpeakers(text) {
@@ -63,7 +63,7 @@ function extractSpeakers(text) {
   String(text || '')
     .split('\n')
     .forEach((line) => {
-      const match = line.trim().match(/^([A-Za-zÄÖÜäöüß .-]{2,32}):\s+\S/)
+      const match = line.trim().match(/^([\p{L} .-]{2,32}):\s+\S/u)
       if (match) speakers.add(match[1].trim())
     })
 

@@ -13,6 +13,9 @@ public class MistralAnalysisResult {
     private String questions;
     private String rawResponse;
 
+    private boolean successful = true;
+    private String errorMessage = "";
+
     /** Strukturierte Action Items (inkl. Deadline) für die Aufgaben-Erzeugung. */
     private List<ActionItem> actionItemList = new ArrayList<>();
 
@@ -36,8 +39,10 @@ public class MistralAnalysisResult {
     public String getQuestions() { return questions; }
     public String getRawResponse() { return rawResponse; }
 
+    public boolean isSuccessful() { return successful; }
+    public String getErrorMessage() { return errorMessage; }
+
     public List<ActionItem> getActionItemList() { return actionItemList; }
-    public void setActionItemList(List<ActionItem> actionItemList) { this.actionItemList = actionItemList; }
 
     // Setter
     public void setSummary(String summary) { this.summary = summary; }
@@ -47,4 +52,11 @@ public class MistralAnalysisResult {
     public void setNextSteps(String nextSteps) { this.nextSteps = nextSteps; }
     public void setQuestions(String questions) { this.questions = questions; }
     public void setRawResponse(String rawResponse) { this.rawResponse = rawResponse; }
+
+    public void setSuccessful(boolean successful) { this.successful = successful; }
+    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+
+    public void setActionItemList(List<ActionItem> actionItemList) {
+        this.actionItemList = actionItemList != null ? actionItemList : new ArrayList<>();
+    }
 }
