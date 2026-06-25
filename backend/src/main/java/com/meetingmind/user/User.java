@@ -26,6 +26,8 @@ public class User {
     @Column(nullable = false)
     private String role;
 
+    private String workspaceName;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -55,6 +57,9 @@ public class User {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public String getWorkspaceName() { return workspaceName; }
+    public void setWorkspaceName(String workspaceName) { this.workspaceName = workspaceName; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
