@@ -33,6 +33,32 @@ public class MeetingController {
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
+
+    @PostMapping("/{id}/analysis-preview")
+    public ResponseEntity<AnalysisPreviewDto> previewAnalysis(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request,
+            Authentication authentication) {
+
+        String transcript = request.get("transcript");
+        Long userId = currentUserId(authentication);
+
+        return ResponseEntity.ok(meetingService.previewAnalysis(id, userId, transcript));
+    }
+
+    @PostMapping("/{id}/analysis-preview/apply")
+    public ResponseEntity<MeetingDto> applyAnalysisPreview(
+            @PathVariable Long id,
+            @RequestBody AnalysisPreviewDto preview,
+            Authentication authentication) {
+
+        Long userId = currentUserId(authentication);
+
+        Meeting meeting = meetingService.applyAnalysisPreview(id, userId, preview);
+        return ResponseEntity.ok(MeetingDto.from(meeting));
+    }
+
+
     @PostMapping("/{id}/analyze")
     public ResponseEntity<MeetingDto> analyzeMeeting(
             @PathVariable Long id,

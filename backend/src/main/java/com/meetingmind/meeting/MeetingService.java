@@ -10,6 +10,7 @@ import com.meetingmind.transcript.Transcript;
 import com.meetingmind.transcript.TranscriptRepository;
 import com.meetingmind.ai.MistralService;
 import com.meetingmind.ai.MistralAnalysisResult;
+import com.meetingmind.ai.ActionItem;
 import com.meetingmind.task.TaskService;
 import com.meetingmind.task.Task;
 import com.meetingmind.task.TaskRepository;
@@ -49,6 +50,67 @@ public class MeetingService {
         meeting.setCreatedBy(user);
         meeting.setMeetingDate(LocalDateTime.now());
         meeting.setStatus("DRAFT");
+
+        return meetingRepository.save(meeting);
+    }
+
+
+    public AnalysisPreviewDto previewAnalysis(Long meetingId, Long userId, String transcript) {
+        getOwnedMeeting(meetingId, userId);
+        String cleanTranscript = requireText(transcript, "Transkript darf nicht leer sein.");
+
+        System.out.println("Starting Mistral preview for meeting: " + meetingId);
+        MistralAnalysisResult analysisResult = mistralService.analyzeTranscript(cleanTranscript);
+
+        if (!analysisResult.isSuccessful()) {
+            String reason = analysisResult.getErrorMessage();
+            String message = reason == null || reason.isBlank()
+                ? "KI-Vorschau fehlgeschlagen."
+                : "KI-Vorschau fehlgeschlagen: " + reason;
+
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message);
+        }
+
+        return AnalysisPreviewDto.from(meetingId, cleanTranscript, analysisResult);
+    }
+
+    public Meeting applyAnalysisPreview(Long meetingId, Long userId, AnalysisPreviewDto preview) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+
+        if (preview == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Analyse-Vorschau fehlt.");
+        }
+
+        String cleanTranscript = requireText(preview.transcript(), "Transkript darf nicht leer sein.");
+
+        Transcript transcriptEntity = transcriptRepository.findByMeeting(meeting)
+            .orElseGet(Transcript::new);
+
+        transcriptEntity.setMeeting(meeting);
+        transcriptEntity.setOriginalText(cleanTranscript);
+        transcriptEntity.setSummary(emptyToNull(preview.summary()));
+        transcriptEntity.setKeyPoints(joinList(preview.keyPoints()));
+        transcriptEntity.setDecisions(joinList(preview.decisions()));
+        transcriptEntity.setActionItems(joinPreviewTasks(preview.actionItems()));
+        transcriptEntity.setNextSteps(joinList(preview.nextSteps()));
+        transcriptEntity.setQuestions(joinList(preview.questions()));
+        transcriptEntity.setMistralRawResponse(emptyToNull(preview.rawResponse()));
+        transcriptEntity.setAnalysisStatus("COMPLETED");
+
+        transcriptRepository.save(transcriptEntity);
+
+        List<ActionItem> actionItems = preview.actionItems() == null
+            ? List.of()
+            : preview.actionItems().stream()
+                .map(AnalysisPreviewTaskDto::toActionItem)
+                .toList();
+
+        taskService.createFromActionItems(meeting, actionItems);
+
+        meeting.setTranscript(cleanTranscript);
+        meeting.setStatus("ANALYZED");
+        meeting.setAiSummary(emptyToNull(preview.summary()));
+        meeting.setUpdatedAt(LocalDateTime.now());
 
         return meetingRepository.save(meeting);
     }
@@ -390,6 +452,47 @@ public class MeetingService {
         }
 
         return value.trim();
+    }
+
+
+    private String joinList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+
+        return values.stream()
+            .filter(value -> value != null && !value.isBlank())
+            .map(String::trim)
+            .reduce((a, b) -> a + "\n" + b)
+            .orElse("");
+    }
+
+    private String joinPreviewTasks(List<AnalysisPreviewTaskDto> tasks) {
+        if (tasks == null || tasks.isEmpty()) {
+            return "";
+        }
+
+        return tasks.stream()
+            .filter(task -> task.title() != null && !task.title().isBlank())
+            .map(task -> {
+                StringBuilder line = new StringBuilder(task.title().trim());
+
+                if (task.assignee() != null && !task.assignee().isBlank()) {
+                    line.append(" [").append(task.assignee().trim()).append("]");
+                }
+
+                if (task.deadline() != null && !task.deadline().isBlank()) {
+                    line.append(" (bis ").append(task.deadline().trim()).append(")");
+                }
+
+                if (task.priority() != null && !task.priority().isBlank()) {
+                    line.append(" {").append(task.priority().trim()).append("}");
+                }
+
+                return line.toString();
+            })
+            .reduce((a, b) -> a + "\n" + b)
+            .orElse("");
     }
 
     private String emptyToNull(String value) {

@@ -27,6 +27,37 @@ function Section({ title, children, empty }) {
 }
 
 
+
+function PreviewList({ title, items = [], empty = 'Keine Einträge erkannt.' }) {
+  return (
+    <div>
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{title}</p>
+
+      {items.length === 0 ? (
+        <p className="mt-2 text-[12.5px] text-muted">{empty}</p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {items.map((item, index) => (
+            <li key={`${title}-${index}`} className="rounded-button border border-line bg-canvas px-3 py-2 text-[13px] leading-relaxed text-ink">
+              {typeof item === 'string' ? item : item.title}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function priorityLabel(priority) {
+  const labels = {
+    HIGH: 'Hoch',
+    MEDIUM: 'Mittel',
+    LOW: 'Niedrig',
+  }
+
+  return labels[String(priority || '').toUpperCase()] || 'Mittel'
+}
+
 function TranscriptStat({ label, value }) {
   return (
     <div className="rounded-button border border-line bg-surface px-3 py-2">
@@ -49,6 +80,9 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [loadingQualityScore, setLoadingQualityScore] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
+  const [analysisPreview, setAnalysisPreview] = useState(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
+  const [applyingPreview, setApplyingPreview] = useState(false)
 
   const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
   const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
@@ -62,6 +96,51 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
     const cleaned = cleanTranscript(transcript, { reduceFillers })
     setTranscript(cleaned)
     setError('')
+  }
+
+
+  async function handleCreateAnalysisPreview() {
+    if (!transcript.trim()) {
+      setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
+      return
+    }
+
+    const preparedTranscript = cleanTranscript(transcript, { reduceFillers: false })
+
+    setTranscript(preparedTranscript)
+    setLoadingPreview(true)
+    setAnalysisPreview(null)
+    setError('')
+
+    try {
+      const res = await api.post(`/meetings/${meeting.id}/analysis-preview`, {
+        transcript: preparedTranscript.trim(),
+      })
+
+      setAnalysisPreview(res.data)
+    } catch (err) {
+      onUpdated?.({ ...meeting, status: 'ANALYSIS_FAILED' })
+      setError(getApiErrorMessage(err, 'Analyse-Vorschau fehlgeschlagen. Bitte prüfe API-Key, Transkript und KI-Verbindung.'))
+    } finally {
+      setLoadingPreview(false)
+    }
+  }
+
+  async function handleApplyAnalysisPreview() {
+    if (!analysisPreview) return
+
+    setApplyingPreview(true)
+    setError('')
+
+    try {
+      const res = await api.post(`/meetings/${meeting.id}/analysis-preview/apply`, analysisPreview)
+      setAnalysisPreview(null)
+      onUpdated(res.data)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Analyse-Vorschau konnte nicht übernommen werden.'))
+    } finally {
+      setApplyingPreview(false)
+    }
   }
 
   async function handleAnalyze() {
@@ -363,6 +442,69 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
 
             <div className="mt-3"><ErrorAlert message={error} /></div>
 
+            {analysisPreview && (
+              <div className="mt-4 rounded-card border border-brand/15 bg-surface p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[13px] font-semibold text-ink">Analyse-Vorschau</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                      Prüfe die erkannten Inhalte, bevor sie als Meeting-Analyse und Aufgaben gespeichert werden.
+                    </p>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={handleApplyAnalysisPreview}
+                    disabled={applyingPreview}
+                  >
+                    {applyingPreview ? 'Übernimmt…' : 'Analyse übernehmen'}
+                  </Button>
+                </div>
+
+                {analysisPreview.summary ? (
+                  <div className="mt-4 rounded-button border border-line bg-canvas px-3 py-3">
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Zusammenfassung</p>
+                    <p className="mt-2 text-[13px] leading-relaxed text-ink">{analysisPreview.summary}</p>
+                  </div>
+                ) : null}
+
+                <div className="mt-4 grid grid-cols-1 gap-4">
+                  <div>
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Erkannte Aufgaben</p>
+
+                    {analysisPreview.actionItems?.length ? (
+                      <ul className="mt-2 space-y-2">
+                        {analysisPreview.actionItems.map((task, index) => (
+                          <li key={`${task.title}-${index}`} className="rounded-button border border-line bg-canvas px-3 py-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-[13px] font-semibold text-ink">{task.title}</p>
+                              <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand">
+                                {priorityLabel(task.priority)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-[12.5px] text-muted">
+                              {task.assignee ? `Zuständig: ${task.assignee}` : 'Kein Verantwortlicher'}
+                              {task.deadline ? ` · Deadline: ${task.deadline}` : ' · Keine Deadline'}
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="mt-2 text-[12.5px] text-muted">Keine Aufgaben erkannt.</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <PreviewList title="Entscheidungen" items={analysisPreview.decisions || []} />
+                    <PreviewList title="Offene Fragen" items={analysisPreview.questions || []} />
+                    <PreviewList title="Nächste Schritte" items={analysisPreview.nextSteps || []} />
+                    <PreviewList title="Wichtige Punkte" items={analysisPreview.keyPoints || []} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+
             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
@@ -384,9 +526,23 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                 </Button>
               </div>
 
-              <Button icon={SparklesIcon} onClick={handleAnalyze} disabled={analyzing}>
-                {analyzing ? 'Analysiere…' : 'Bereinigt analysieren'}
-              </Button>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  icon={SparklesIcon}
+                  onClick={handleCreateAnalysisPreview}
+                  disabled={loadingPreview || analyzing}
+                >
+                  {loadingPreview ? 'Erstellt Vorschau…' : 'Vorschau erstellen'}
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  onClick={handleAnalyze}
+                  disabled={analyzing || loadingPreview}
+                >
+                  {analyzing ? 'Analysiere…' : 'Direkt analysieren'}
+                </Button>
+              </div>
             </div>
 
             <div className="mt-4 rounded-button border border-blue-100 bg-blue-50 px-4 py-3">
