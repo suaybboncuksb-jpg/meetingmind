@@ -123,6 +123,10 @@ public class TaskService {
             task.setAssignee(emptyToNull(item.assignee()));
             task.setDeadline(parseDate(item.deadline()));
 
+            if (item.priority() != null && !item.priority().isBlank()) {
+                task.setPriority(normalizePriority(item.priority()));
+            }
+
             taskRepository.save(task);
         }
     }

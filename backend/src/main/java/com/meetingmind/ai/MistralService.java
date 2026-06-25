@@ -13,8 +13,10 @@ import org.apache.hc.core5.http.io.entity.EntityUtils;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class MistralService {
@@ -43,22 +45,46 @@ public class MistralService {
 
     private String systemPrompt() {
         String today = LocalDate.now().toString();
+
         return """
-            Du bist ein Assistent, der deutschsprachige Meeting-Transkripte analysiert.
-            Heutiges Datum: %s (Wochentag heute beachten).
+            Du bist ein präziser Assistent für deutschsprachige Meeting-Analyse.
+            Heutiges Datum: %s.
+
+            Deine Aufgabe:
+            Extrahiere nur echte, umsetzbare Arbeitsergebnisse aus dem Meeting.
+
             Antworte AUSSCHLIESSLICH mit gültigem JSON in genau diesem Schema:
             {
               "summary": "2-3 Sätze Zusammenfassung",
-              "keyPoints": ["wichtigster Punkt", "..."],
-              "decisions": ["getroffene Entscheidung", "..."],
-              "actionItems": [{"title": "konkrete Aufgabe", "assignee": "Name oder leer", "deadline": "YYYY-MM-DD oder leer"}],
+              "keyPoints": ["wichtiger Punkt", "..."],
+              "decisions": ["konkrete Entscheidung", "..."],
+              "actionItems": [
+                {
+                  "title": "konkrete Aufgabe mit Ergebnis",
+                  "assignee": "Name der verantwortlichen Person oder leer",
+                  "deadline": "YYYY-MM-DD oder leer",
+                  "priority": "LOW | MEDIUM | HIGH"
+                }
+              ],
               "nextSteps": ["nächster Schritt", "..."],
               "questions": ["offene Frage", "..."]
             }
-            Wandle relative Fristangaben (z. B. "bis Freitag", "nächste Woche", "in 3 Tagen")
-            ausgehend vom heutigen Datum in ein konkretes Datum im Format YYYY-MM-DD um.
-            Wenn keine Frist genannt ist, setze deadline auf "".
-            Verwende leere Arrays, wenn nichts zutrifft. Kein Text außerhalb des JSON.
+
+            Regeln für actionItems:
+            - Nur echte To-dos aufnehmen, keine allgemeinen Stichpunkte.
+            - Jede Aufgabe muss als konkretes Ergebnis formuliert sein.
+            - Schlechte Titel wie "Prüfen", "Klären", "Besprechen", "Todo", "Test" vermeiden.
+            - Besser: "Angebotszahlen prüfen", "Technische Fragen mit Kunden klären".
+            - Wenn eine Person sagt "ich übernehme...", dann ist diese Person assignee.
+            - Wenn ein Sprecher klar eine Aufgabe übernimmt, nutze den Sprechernamen als assignee.
+            - Relative Fristen wie "bis Freitag", "nächste Woche", "in 3 Tagen" ausgehend vom heutigen Datum in YYYY-MM-DD umwandeln.
+            - Wenn keine Frist genannt ist, deadline auf "" setzen.
+            - HIGH bei dringenden, kundenkritischen, blockierenden oder kurzfristigen Aufgaben.
+            - MEDIUM bei normalen Aufgaben.
+            - LOW bei optionalen oder weniger dringenden Aufgaben.
+            - Keine Duplikate erzeugen.
+            - Verwende leere Arrays, wenn nichts zutrifft.
+            - Kein Text außerhalb des JSON.
             """.formatted(today);
     }
 
@@ -71,12 +97,12 @@ public class MistralService {
 
             Map<String, Object> requestBody = Map.of(
                 "model", MODEL,
-                "temperature", 0.2,
+                "temperature", 0.15,
                 "response_format", Map.of("type", "json_object"),
                 "messages", List.of(
                     Map.of("role", "system", "content", systemPrompt()),
                     Map.of("role", "user", "content",
-                        "Analysiere das folgende Meeting-Transkript:\n\n" + transcript)
+                        "Analysiere das folgende Meeting-Transkript und extrahiere präzise Aufgaben:\n\n" + transcript)
                 )
             );
 
@@ -86,9 +112,11 @@ public class MistralService {
             return httpClient.execute(httpPost, resp -> {
                 String body = resp.getEntity() != null
                     ? EntityUtils.toString(resp.getEntity(), StandardCharsets.UTF_8) : "";
+
                 if (resp.getCode() != 200) {
                     throw new RuntimeException("Mistral API error " + resp.getCode() + ": " + body);
                 }
+
                 return body;
             });
         }
@@ -97,90 +125,197 @@ public class MistralService {
     private MistralAnalysisResult parseMistralResponse(String response) throws Exception {
         JsonNode root = mapper.readTree(response);
         String content = root.path("choices").path(0).path("message").path("content").asText("");
+
         if (content.isBlank()) {
             return createErrorResult("Leere Antwort von Mistral");
         }
 
         JsonNode data = mapper.readTree(content);
+        List<ActionItem> actionItems = extractActionItems(data.path("actionItems"));
 
         MistralAnalysisResult result = new MistralAnalysisResult(
             data.path("summary").asText(""),
             joinLines(data.path("keyPoints")),
             joinLines(data.path("decisions")),
-            buildActionItems(data.path("actionItems")),
+            buildActionItems(actionItems),
             joinLines(data.path("nextSteps")),
             joinLines(data.path("questions")),
             content
         );
-        result.setActionItemList(extractActionItems(data.path("actionItems")));
+
+        result.setActionItemList(actionItems);
         return result;
     }
 
-    /** Action Items als strukturierte Liste (Titel, Assignee, Deadline). */
+    /** Action Items als strukturierte Liste mit Validierung und Duplikatfilter. */
     private List<ActionItem> extractActionItems(JsonNode array) {
         List<ActionItem> items = new ArrayList<>();
-        if (array == null || !array.isArray()) return items;
+        Set<String> seen = new LinkedHashSet<>();
+
+        if (array == null || !array.isArray()) {
+            return items;
+        }
+
         for (JsonNode node : array) {
             String title;
             String assignee = "";
             String deadline = "";
+            String priority = "MEDIUM";
+
             if (node.isTextual()) {
-                title = node.asText();
+                title = node.asText("");
             } else {
                 title = node.path("title").asText("");
                 assignee = node.path("assignee").asText("");
                 deadline = node.path("deadline").asText("");
+                priority = node.path("priority").asText("MEDIUM");
             }
-            if (title == null || title.isBlank()) continue;
-            items.add(new ActionItem(title.trim(), assignee.trim(), deadline.trim()));
+
+            ActionItem item = normalizeActionItem(title, assignee, deadline, priority);
+
+            if (item == null) {
+                continue;
+            }
+
+            String key = (
+                item.title() + "|" +
+                item.assignee() + "|" +
+                item.deadline()
+            ).toLowerCase();
+
+            if (seen.add(key)) {
+                items.add(item);
+            }
         }
+
         return items;
     }
 
-    /** String-Array (oder Objekte) -> eine Zeile pro Eintrag. */
+    private ActionItem normalizeActionItem(String title, String assignee, String deadline, String priority) {
+        String cleanTitle = cleanText(title)
+            .replaceAll("^[\\-•*]+\\s*", "")
+            .replaceAll("\\.$", "")
+            .trim();
+
+        if (!isUsefulActionTitle(cleanTitle)) {
+            return null;
+        }
+
+        String cleanAssignee = normalizeAssignee(assignee);
+        String cleanDeadline = normalizeDeadline(deadline);
+        String cleanPriority = normalizePriority(priority);
+
+        return new ActionItem(cleanTitle, cleanAssignee, cleanDeadline, cleanPriority);
+    }
+
+    private boolean isUsefulActionTitle(String title) {
+        String normalized = cleanText(title).toLowerCase();
+
+        if (normalized.isBlank()) return false;
+        if (normalized.length() < 8) return false;
+        if (normalized.startsWith("test")) return false;
+
+        Set<String> generic = Set.of(
+            "todo",
+            "aufgabe",
+            "machen",
+            "prüfen",
+            "klären",
+            "besprechen",
+            "vorbereiten",
+            "nachfragen"
+        );
+
+        if (generic.contains(normalized)) {
+            return false;
+        }
+
+        String[] words = normalized.split("\\s+");
+        return words.length >= 2;
+    }
+
+    private String normalizeAssignee(String value) {
+        String clean = cleanText(value);
+
+        if (clean.isBlank()) return "";
+
+        String lower = clean.toLowerCase();
+
+        if (Set.of("leer", "keine", "keiner", "unbekannt", "n/a", "none", "null").contains(lower)) {
+            return "";
+        }
+
+        return clean;
+    }
+
+    private String normalizeDeadline(String value) {
+        String clean = cleanText(value);
+
+        if (clean.isBlank()) return "";
+
+        try {
+            return LocalDate.parse(clean).toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String normalizePriority(String value) {
+        String clean = cleanText(value).toUpperCase();
+
+        if (Set.of("LOW", "MEDIUM", "HIGH").contains(clean)) {
+            return clean;
+        }
+
+        return "MEDIUM";
+    }
+
+    private String cleanText(String value) {
+        return value == null ? "" : value.replaceAll("\\s+", " ").trim();
+    }
+
+    /** String-Array oder Objekte -> eine Zeile pro Eintrag. */
     private String joinLines(JsonNode array) {
         if (array == null || !array.isArray()) return "";
+
         StringBuilder sb = new StringBuilder();
+
         for (JsonNode node : array) {
             String line = node.isTextual() ? node.asText() : node.path("title").asText(node.toString());
             line = line.trim();
+
             if (!line.isEmpty()) {
                 if (sb.length() > 0) sb.append("\n");
                 sb.append(line);
             }
         }
+
         return sb.toString();
     }
 
-    /**
-     * Action Items als Zeilen "Titel [Assignee]" – passend zur Task-Erzeugung,
-     * die den Verantwortlichen aus den eckigen Klammern liest.
-     */
-    private String buildActionItems(JsonNode array) {
-        if (array == null || !array.isArray()) return "";
+    private String buildActionItems(List<ActionItem> items) {
+        if (items == null || items.isEmpty()) return "";
+
         StringBuilder sb = new StringBuilder();
-        for (JsonNode node : array) {
-            String title;
-            String assignee = "";
-            String deadline = "";
-            if (node.isTextual()) {
-                title = node.asText();
-            } else {
-                title = node.path("title").asText("");
-                assignee = node.path("assignee").asText("");
-                deadline = node.path("deadline").asText("");
-            }
-            title = title.trim();
-            if (title.isEmpty()) continue;
+
+        for (ActionItem item : items) {
             if (sb.length() > 0) sb.append("\n");
-            sb.append(title);
-            if (assignee != null && !assignee.isBlank()) {
-                sb.append(" [").append(assignee.trim()).append("]");
+
+            sb.append(item.title());
+
+            if (item.assignee() != null && !item.assignee().isBlank()) {
+                sb.append(" [").append(item.assignee()).append("]");
             }
-            if (deadline != null && !deadline.isBlank()) {
-                sb.append(" (bis ").append(deadline.trim()).append(")");
+
+            if (item.deadline() != null && !item.deadline().isBlank()) {
+                sb.append(" (bis ").append(item.deadline()).append(")");
+            }
+
+            if (item.priority() != null && !item.priority().isBlank()) {
+                sb.append(" {").append(item.priority()).append("}");
             }
         }
+
         return sb.toString();
     }
 
