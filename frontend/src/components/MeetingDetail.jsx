@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import ErrorAlert from './ui/ErrorAlert.jsx'
@@ -6,6 +6,12 @@ import StatusBadge from './ui/StatusBadge.jsx'
 import { XIcon, SparklesIcon } from './icons.jsx'
 import { formatDate, meetingDateOf } from '../lib/meetings.js'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
+import {
+  cleanTranscript,
+  getTranscriptQuality,
+  getTranscriptStats,
+  transcriptQualityBadgeClass,
+} from '../lib/transcriptionStudio.js'
 
 
 /** Labeled Section mit Inhalt oder ruhigem Empty-State. */
@@ -16,6 +22,16 @@ function Section({ title, children, empty }) {
       <div className="mt-2 text-[14px] leading-relaxed text-ink">
         {children || <p className="text-[13px] text-muted">{empty}</p>}
       </div>
+    </div>
+  )
+}
+
+
+function TranscriptStat({ label, value }) {
+  return (
+    <div className="rounded-button border border-line bg-surface px-3 py-2">
+      <p className="text-[16px] font-semibold text-ink">{value}</p>
+      <p className="mt-0.5 text-[11.5px] text-muted">{label}</p>
     </div>
   )
 }
@@ -34,15 +50,33 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
 
+  const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
+  const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
+
+  function handleCleanTranscript(reduceFillers = false) {
+    if (!transcript.trim()) {
+      setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
+      return
+    }
+
+    const cleaned = cleanTranscript(transcript, { reduceFillers })
+    setTranscript(cleaned)
+    setError('')
+  }
+
   async function handleAnalyze() {
     if (!transcript.trim()) {
       setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
       return
     }
+    const preparedTranscript = cleanTranscript(transcript, { reduceFillers: false })
+
+    setTranscript(preparedTranscript)
     setAnalyzing(true)
     setError('')
+
     try {
-      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript: transcript.trim() })
+      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript: preparedTranscript.trim() })
       onUpdated(res.data)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen.'))
@@ -272,22 +306,94 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
             )}
           </div>
 
-          {/* Protokoll / Transkript + Analyse */}
+          {/* Transkriptions-Studio + Analyse */}
           <div className="rounded-card border border-line bg-canvas p-5">
-            <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
-              Protokoll / Transkript
-            </h4>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-[12px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Transkriptions-Studio
+                </h4>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">
+                  Bereinige und strukturiere dein Meeting-Transkript, bevor es an die KI-Analyse geht.
+                </p>
+              </div>
+
+              <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${transcriptQualityBadgeClass(transcriptQuality.level)}`}>
+                {transcriptQuality.score} % · {transcriptQuality.label}
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <TranscriptStat label="Wörter" value={transcriptStats.words} />
+              <TranscriptStat label="Zeilen" value={transcriptStats.lines} />
+              <TranscriptStat label="Sprecher" value={transcriptStats.speakerCount} />
+              <TranscriptStat label="Min. Lesezeit" value={transcriptStats.estimatedMinutes} />
+            </div>
+
+            <div className="mt-4 rounded-button border border-line bg-surface px-4 py-3">
+              <p className="text-[13px] font-semibold text-ink">{transcriptQuality.summary}</p>
+
+              {transcriptQuality.issues.length > 0 ? (
+                <ul className="mt-2 space-y-1.5">
+                  {transcriptQuality.issues.slice(0, 3).map((issue) => (
+                    <li key={issue} className="text-[12.5px] leading-relaxed text-muted">
+                      • {issue}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                  Das Transkript ist bereit für eine bessere Analyse von Aufgaben, Entscheidungen und offenen Fragen.
+                </p>
+              )}
+            </div>
+
             <textarea
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
-              placeholder="Füge hier das Meeting-Protokoll oder Transkript ein…"
-              className="mt-3 min-h-[140px] w-full resize-y rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/12"
+              placeholder={`Füge hier dein Meeting-Protokoll oder Transkript ein…
+
+Beispiel:
+Suayb: Wir müssen das Angebot bis Freitag vorbereiten.
+Ayşe: Ich übernehme die Prüfung der Zahlen.
+Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
+              className="mt-4 min-h-[220px] w-full resize-y rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink outline-none transition placeholder:text-muted/70 focus:border-brand focus:ring-4 focus:ring-brand/12"
             />
+
             <div className="mt-3"><ErrorAlert message={error} /></div>
-            <div className="mt-3 flex justify-end">
+
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCleanTranscript(false)}
+                  disabled={!transcript.trim() || analyzing}
+                >
+                  Transkript bereinigen
+                </Button>
+
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleCleanTranscript(true)}
+                  disabled={!transcript.trim() || analyzing}
+                >
+                  Füllwörter reduzieren
+                </Button>
+              </div>
+
               <Button icon={SparklesIcon} onClick={handleAnalyze} disabled={analyzing}>
-                {analyzing ? 'Analysiere…' : 'KI-Analyse starten'}
+                {analyzing ? 'Analysiere…' : 'Bereinigt analysieren'}
               </Button>
+            </div>
+
+            <div className="mt-4 rounded-button border border-blue-100 bg-blue-50 px-4 py-3">
+              <p className="text-[13px] font-semibold text-brand">Tipp für bessere Aufgabenanalyse</p>
+              <p className="mt-1 text-[12.5px] leading-relaxed text-brand/80">
+                Die besten Ergebnisse entstehen, wenn Sprecher, Verantwortliche und Deadlines klar genannt werden:
+                „Name: Ich übernehme Aufgabe X bis Datum Y.“
+              </p>
             </div>
           </div>
         </div>
