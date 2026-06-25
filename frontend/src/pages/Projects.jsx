@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import api from '../api/client.js'
 import PageHeader from '../components/ui/PageHeader.jsx'
 import DataCard from '../components/ui/DataCard.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
@@ -27,7 +28,95 @@ function normalizeProjectName(value) {
   return String(value || '').trim()
 }
 
-function buildProjectFiles(meetings = [], tasks = []) {
+function toTimestamp(value) {
+  if (!value) return 0
+
+  const timestamp = new Date(value).getTime()
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+function addAnalysisItems(project, meeting, analysis, field, targetField) {
+  const items = Array.isArray(analysis?.[field]) ? analysis[field] : []
+
+  items.forEach((item, index) => {
+    const text = String(item || '').trim()
+    if (!text) return
+
+    project[targetField].push({
+      id: `${meeting.id}-${field}-${index}`,
+      text,
+      meetingTitle: meeting.title || 'Ohne Titel',
+      meetingId: meeting.id,
+    })
+  })
+}
+
+function getProjectHealth(project) {
+  const criticalCount = project.overdueTasks + project.todayTasks + project.unassignedTasks
+
+  if (project.overdueTasks > 0) {
+    return {
+      label: 'Kritisch',
+      className: 'bg-red-50 text-red-700',
+      detail: 'Mindestens eine Aufgabe ist überfällig.',
+    }
+  }
+
+  if (project.todayTasks > 0 || project.unassignedTasks > 0) {
+    return {
+      label: 'Aufmerksamkeit',
+      className: 'bg-amber-50 text-amber-700',
+      detail: `${criticalCount} Punkt(e) brauchen zeitnah Aufmerksamkeit.`,
+    }
+  }
+
+  if (project.openTasks > 0) {
+    return {
+      label: 'Aktiv',
+      className: 'bg-blue-50 text-brand',
+      detail: 'Projekt läuft, aber es gibt noch offene Aufgaben.',
+    }
+  }
+
+  return {
+    label: 'Stabil',
+    className: 'bg-emerald-50 text-emerald-700',
+    detail: 'Keine kritischen offenen Punkte sichtbar.',
+  }
+}
+
+function getCompletionRate(project) {
+  const total = project.openTasks + project.doneTasks
+  if (total === 0) return 0
+
+  return Math.round((project.doneTasks / total) * 100)
+}
+
+function getNextBestAction(project) {
+  if (project.overdueTasks > 0) {
+    return 'Überfällige Aufgaben zuerst klären und Verantwortliche informieren.'
+  }
+
+  if (project.unassignedTasks > 0) {
+    return 'Aufgaben ohne Zuständige zuweisen, damit nichts liegen bleibt.'
+  }
+
+  if (project.questions.length > 0) {
+    return 'Offene Fragen in konkrete Aufgaben oder Klärungspunkte umwandeln.'
+  }
+
+  if (project.openTasks > 0) {
+    return 'Offene Aufgaben priorisieren und die nächsten Schritte prüfen.'
+  }
+
+  if (project.meetings.length === 0) {
+    return 'Ein erstes Meeting oder Kundengespräch zur Projektakte hinzufügen.'
+  }
+
+  return 'Projektakte aktuell halten und neue Meetings konsequent dokumentieren.'
+}
+
+function buildProjectFiles(meetings = [], tasks = [], analysesByMeetingId = {}) {
   const projects = new Map()
 
   const ensureProject = (name) => {
@@ -42,23 +131,45 @@ function buildProjectFiles(meetings = [], tasks = []) {
         name: cleanName,
         meetings: [],
         tasks: [],
+        decisions: [],
+        questions: [],
+        nextSteps: [],
+        keyPoints: [],
         openTasks: 0,
         doneTasks: 0,
         overdueTasks: 0,
         todayTasks: 0,
         thisWeekTasks: 0,
         unassignedTasks: 0,
+        latestActivityAt: null,
       })
     }
 
     return projects.get(key)
   }
 
+  const updateLatestActivity = (project, value) => {
+    const timestamp = toTimestamp(value)
+    const current = toTimestamp(project.latestActivityAt)
+
+    if (timestamp > current) {
+      project.latestActivityAt = value
+    }
+  }
+
   meetings.forEach((meeting) => {
     const project = ensureProject(meeting.projectName)
-    if (project) {
-      project.meetings.push(meeting)
-    }
+    if (!project) return
+
+    project.meetings.push(meeting)
+    updateLatestActivity(project, meeting.updatedAt || meetingDateOf(meeting))
+
+    const analysis = analysesByMeetingId[meeting.id]
+
+    addAnalysisItems(project, meeting, analysis, 'decisions', 'decisions')
+    addAnalysisItems(project, meeting, analysis, 'questions', 'questions')
+    addAnalysisItems(project, meeting, analysis, 'nextSteps', 'nextSteps')
+    addAnalysisItems(project, meeting, analysis, 'keyPoints', 'keyPoints')
   })
 
   tasks.forEach((task) => {
@@ -66,6 +177,7 @@ function buildProjectFiles(meetings = [], tasks = []) {
     if (!project) return
 
     project.tasks.push(task)
+    updateLatestActivity(project, task.updatedAt || task.createdAt || task.deadline)
 
     if (task.status === 'DONE') {
       project.doneTasks += 1
@@ -98,18 +210,102 @@ function buildProjectFiles(meetings = [], tasks = []) {
 
         return dateA - dateB
       }),
+      health: getProjectHealth(project),
+      completionRate: getCompletionRate(project),
+      nextBestAction: getNextBestAction(project),
     }))
     .sort((a, b) => {
-      const criticalDiff = (b.overdueTasks + b.todayTasks + b.unassignedTasks) - (a.overdueTasks + a.todayTasks + a.unassignedTasks)
+      const criticalDiff =
+        (b.overdueTasks + b.todayTasks + b.unassignedTasks) -
+        (a.overdueTasks + a.todayTasks + a.unassignedTasks)
+
       if (criticalDiff !== 0) return criticalDiff
 
       return a.name.localeCompare(b.name)
     })
 }
 
+function AnalysisMiniList({ title, items = [], empty }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">{title}</p>
+        <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+          {items.length}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="mt-2 rounded-button border border-line bg-canvas px-3 py-3 text-[12.5px] text-muted">
+          {empty}
+        </p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {items.slice(0, 5).map((item) => (
+            <li key={item.id} className="rounded-button border border-line bg-canvas px-3 py-3">
+              <p className="text-[13px] leading-relaxed text-ink">{item.text}</p>
+              <p className="mt-1 text-[12px] text-muted">Aus: {item.meetingTitle}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function Projects({ meetings = [], tasks = [], onNavigate }) {
-  const projectFiles = useMemo(() => buildProjectFiles(meetings, tasks), [meetings, tasks])
   const [selectedProjectKey, setSelectedProjectKey] = useState(null)
+  const [analysesByMeetingId, setAnalysesByMeetingId] = useState({})
+  const [loadingAnalyses, setLoadingAnalyses] = useState(false)
+
+  useEffect(() => {
+    const projectMeetings = meetings.filter((meeting) => normalizeProjectName(meeting.projectName))
+
+    if (projectMeetings.length === 0) {
+      setAnalysesByMeetingId({})
+      return
+    }
+
+    let cancelled = false
+
+    async function loadAnalyses() {
+      setLoadingAnalyses(true)
+
+      try {
+        const entries = await Promise.all(
+          projectMeetings.map(async (meeting) => {
+            try {
+              const res = await api.get(`/meetings/${meeting.id}/analysis`)
+              return [meeting.id, res.data]
+            } catch {
+              return [meeting.id, null]
+            }
+          }),
+        )
+
+        if (!cancelled) {
+          setAnalysesByMeetingId(
+            Object.fromEntries(entries.filter(([, analysis]) => Boolean(analysis))),
+          )
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingAnalyses(false)
+        }
+      }
+    }
+
+    loadAnalyses()
+
+    return () => {
+      cancelled = true
+    }
+  }, [meetings])
+
+  const projectFiles = useMemo(
+    () => buildProjectFiles(meetings, tasks, analysesByMeetingId),
+    [meetings, tasks, analysesByMeetingId],
+  )
 
   const selectedProject = useMemo(() => {
     if (!selectedProjectKey) return projectFiles[0] || null
@@ -122,12 +318,13 @@ export default function Projects({ meetings = [], tasks = [], onNavigate }) {
     (sum, project) => sum + project.overdueTasks + project.todayTasks + project.unassignedTasks,
     0,
   )
+  const totalOpenQuestions = projectFiles.reduce((sum, project) => sum + project.questions.length, 0)
 
   return (
     <div className="space-y-7">
       <PageHeader
         title="Projekte / Kunden"
-        subtitle="Digitale Akten für Kunden, Projekte, Meetings, Aufgaben und offene Punkte."
+        subtitle="Digitale Projektakten mit Meetings, Aufgaben, Entscheidungen, offenen Fragen und nächster Aktion."
       />
 
       {projectFiles.length === 0 ? (
@@ -141,7 +338,7 @@ export default function Projects({ meetings = [], tasks = [], onNavigate }) {
         </DataCard>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             <DataCard title="Projektakten" icon={UsersIcon}>
               <p className="text-3xl font-semibold text-ink">{projectFiles.length}</p>
               <p className="mt-1 text-[13px] text-muted">aktive Kunden / Projekte</p>
@@ -163,9 +360,16 @@ export default function Projects({ meetings = [], tasks = [], onNavigate }) {
               <p className="text-3xl font-semibold text-ink">{totalCriticalTasks}</p>
               <p className="mt-1 text-[13px] text-muted">überfällig, heute oder unzugeordnet</p>
             </DataCard>
+
+            <DataCard title="Offene Fragen" icon={FileTextIcon}>
+              <p className="text-3xl font-semibold text-ink">{totalOpenQuestions}</p>
+              <p className="mt-1 text-[13px] text-muted">
+                {loadingAnalyses ? 'Analyse lädt…' : 'aus Meeting-Analysen'}
+              </p>
+            </DataCard>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
             <DataCard title="Projektübersicht" icon={ListIcon} noPadding>
               <ul className="divide-y divide-line">
                 {projectFiles.map((project) => {
@@ -187,12 +391,15 @@ export default function Projects({ meetings = [], tasks = [], onNavigate }) {
                             <p className="mt-1 text-[12.5px] text-muted">
                               {project.meetings.length} Meeting(s) · {project.openTasks} offene Aufgabe(n)
                             </p>
+                            <p className="mt-1 text-[12px] text-muted">
+                              Letzte Aktivität: {formatDate(project.latestActivityAt)}
+                            </p>
                           </div>
 
                           <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                            criticalCount > 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
+                            criticalCount > 0 ? 'bg-red-50 text-red-700' : project.health.className
                           }`}>
-                            {criticalCount > 0 ? `${criticalCount} kritisch` : 'stabil'}
+                            {criticalCount > 0 ? `${criticalCount} kritisch` : project.health.label}
                           </span>
                         </div>
                       </button>
@@ -228,9 +435,72 @@ export default function Projects({ meetings = [], tasks = [], onNavigate }) {
                         <p className="text-[12px] text-amber-700/70">Heute</p>
                       </div>
                       <div className="rounded-button bg-blue-50 px-4 py-3">
-                        <p className="text-[18px] font-semibold text-brand">{selectedProject.thisWeekTasks}</p>
-                        <p className="text-[12px] text-brand/70">Woche</p>
+                        <p className="text-[18px] font-semibold text-brand">{selectedProject.questions.length}</p>
+                        <p className="text-[12px] text-brand/70">Offene Fragen</p>
                       </div>
+                    </div>
+
+                    <div className="mt-5 rounded-card border border-line bg-surface p-4">
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-[13px] font-semibold text-ink">Projektstatus</p>
+                          <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                            {selectedProject.health.detail}
+                          </p>
+                        </div>
+
+                        <span className={`self-start rounded-full px-3 py-1.5 text-[12px] font-semibold ${selectedProject.health.className}`}>
+                          {selectedProject.health.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between text-[12px] text-muted">
+                          <span>Fortschritt erledigter Aufgaben</span>
+                          <span>{selectedProject.completionRate}%</span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-soft">
+                          <div
+                            className="h-full rounded-full bg-brand transition-all"
+                            style={{ width: `${selectedProject.completionRate}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-button border border-blue-100 bg-blue-50 px-4 py-3">
+                        <p className="text-[13px] font-semibold text-brand">Nächste beste Aktion</p>
+                        <p className="mt-1 text-[12.5px] leading-relaxed text-brand/80">
+                          {selectedProject.nextBestAction}
+                        </p>
+                      </div>
+                    </div>
+                  </DataCard>
+
+                  <DataCard title="Entscheidungen & Klärungspunkte" icon={FileTextIcon}>
+                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                      <AnalysisMiniList
+                        title="Entscheidungen"
+                        items={selectedProject.decisions}
+                        empty="Noch keine Entscheidungen in dieser Projektakte dokumentiert."
+                      />
+
+                      <AnalysisMiniList
+                        title="Offene Fragen"
+                        items={selectedProject.questions}
+                        empty="Keine offenen Fragen in dieser Projektakte vorhanden."
+                      />
+
+                      <AnalysisMiniList
+                        title="Nächste Schritte"
+                        items={selectedProject.nextSteps}
+                        empty="Noch keine nächsten Schritte erkannt."
+                      />
+
+                      <AnalysisMiniList
+                        title="Wichtige Punkte"
+                        items={selectedProject.keyPoints}
+                        empty="Noch keine wichtigen Punkte gespeichert."
+                      />
                     </div>
                   </DataCard>
 
