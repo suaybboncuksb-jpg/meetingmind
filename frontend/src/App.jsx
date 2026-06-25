@@ -215,6 +215,7 @@ function App() {
         loading={loadingMeetings}
         onNewMeeting={openCreate}
         onMeetingUpdated={handleMeetingUpdated}
+        onTaskCreated={handleTaskCreated}
       />
     ),
     tasks: (

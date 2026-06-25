@@ -109,7 +109,7 @@ function CalendarView({ meetings, onOpen }) {
   )
 }
 
-export default function Meetings({ meetings = [], loading, onNewMeeting, onMeetingUpdated }) {
+export default function Meetings({ meetings = [], loading, onNewMeeting, onMeetingUpdated, onTaskCreated }) {
   const [tab, setTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -181,6 +181,7 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
           meeting={selected}
           onClose={() => setSelectedId(null)}
           onUpdated={(updated) => { onMeetingUpdated?.(updated); }}
+          onTaskCreated={onTaskCreated}
         />
       )}
     </div>

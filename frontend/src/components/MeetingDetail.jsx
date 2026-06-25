@@ -106,7 +106,7 @@ function TranscriptStat({ label, value }) {
  * MeetingDetail – Slide-over mit vorbereiteter Struktur für die Analyse.
  * KI-Analyse ist gegen den bestehenden Backend-Endpoint verdrahtet.
  */
-export default function MeetingDetail({ meeting, onClose, onUpdated }) {
+export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreated }) {
   const [transcript, setTranscript] = useState(meeting.transcript || '')
   const [analyzing, setAnalyzing] = useState(false)
   const [followUp, setFollowUp] = useState(null)
@@ -120,6 +120,8 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
   const [applyingPreview, setApplyingPreview] = useState(false)
   const [analysisDetails, setAnalysisDetails] = useState(null)
   const [loadingAnalysisDetails, setLoadingAnalysisDetails] = useState(false)
+  const [creatingQuestionTask, setCreatingQuestionTask] = useState('')
+  const [questionTaskSuccess, setQuestionTaskSuccess] = useState('')
 
   const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
   const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
@@ -230,6 +232,41 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
       setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen. Bitte prüfe API-Key, Transkript und KI-Verbindung.'))
     } finally {
       setAnalyzing(false)
+    }
+  }
+
+
+  async function handleCreateTaskFromQuestion(question) {
+    const cleanQuestion = String(question || '').trim()
+
+    if (!cleanQuestion) {
+      setError('Offene Frage ist leer.')
+      return
+    }
+
+    const taskTitle = cleanQuestion.endsWith('?')
+      ? `Klären: ${cleanQuestion.slice(0, -1)}`
+      : `Klären: ${cleanQuestion}`
+
+    setCreatingQuestionTask(cleanQuestion)
+    setQuestionTaskSuccess('')
+    setError('')
+
+    try {
+      const res = await api.post('/tasks', {
+        title: taskTitle,
+        assignee: null,
+        deadline: null,
+        priority: 'MEDIUM',
+        meetingId: meeting.id,
+      })
+
+      onTaskCreated?.(res.data)
+      setQuestionTaskSuccess(cleanQuestion)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Aus der offenen Frage konnte keine Aufgabe erstellt werden.'))
+    } finally {
+      setCreatingQuestionTask('')
     }
   }
 
@@ -344,12 +381,47 @@ export default function MeetingDetail({ meeting, onClose, onUpdated }) {
                 tone="decision"
               />
 
-              <AnalysisResultList
-                title="Offene Fragen"
-                items={analysisDetails?.questions || []}
-                empty="Keine offenen Fragen erkannt."
-                tone="question"
-              />
+              <div>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Offene Fragen</p>
+                  <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
+                    {(analysisDetails?.questions || []).length}
+                  </span>
+                </div>
+
+                {(analysisDetails?.questions || []).length === 0 ? (
+                  <p className="mt-2 rounded-button border border-line bg-canvas px-3 py-3 text-[12.5px] text-muted">
+                    Keine offenen Fragen erkannt.
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {(analysisDetails?.questions || []).map((question, index) => {
+                      const isCreating = creatingQuestionTask === question
+                      const wasCreated = questionTaskSuccess === question
+
+                      return (
+                        <li
+                          key={`Offene Fragen-${index}`}
+                          className="rounded-button border border-amber-100 bg-amber-50 px-3 py-3 text-amber-800"
+                        >
+                          <p className="text-[13px] leading-relaxed">{question}</p>
+
+                          <div className="mt-3 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant={wasCreated ? 'secondary' : 'primary'}
+                              onClick={() => handleCreateTaskFromQuestion(question)}
+                              disabled={isCreating || wasCreated}
+                            >
+                              {isCreating ? 'Wird erstellt…' : wasCreated ? 'Aufgabe erstellt ✅' : 'Als Aufgabe anlegen'}
+                            </Button>
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
 
               <AnalysisResultList
                 title="Nächste Schritte"
