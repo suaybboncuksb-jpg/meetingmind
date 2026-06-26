@@ -48,6 +48,13 @@ const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
+
+function memberLabel(member) {
+  const name = [member?.firstName, member?.lastName].filter(Boolean).join(' ').trim()
+
+  return name || member?.email || ''
+}
+
 function PriorityBadge({ priority }) {
   const meta = PRIORITY[priority] || PRIORITY.MEDIUM
 
@@ -242,6 +249,39 @@ export default function Tasks({
   const [loadingComments, setLoadingComments] = useState(false)
   const [postingComment, setPostingComment] = useState(false)
   const [commentError, setCommentError] = useState('')
+  const [teamMembers, setTeamMembers] = useState([])
+  const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
+
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadTeamMembers() {
+      setLoadingTeamMembers(true)
+
+      try {
+        const res = await api.get('/team')
+
+        if (!cancelled) {
+          setTeamMembers(Array.isArray(res.data?.members) ? res.data.members : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setTeamMembers([])
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingTeamMembers(false)
+        }
+      }
+    }
+
+    loadTeamMembers()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const filtered = useMemo(
     () => tasks.filter((task) => {
@@ -267,7 +307,21 @@ export default function Tasks({
     [tasks, selectedTaskId],
   )
 
-  const currentUserLabel = user?.firstName || user?.name || user?.email || 'Ich'
+  const currentUserLabel = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || user?.email || 'Ich'
+
+  const fallbackMember = user ? {
+    id: user.id || user.email || 'me',
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+  } : null
+
+  const effectiveTeamMembers = teamMembers.length
+    ? teamMembers
+    : fallbackMember
+      ? [fallbackMember]
+      : []
 
   useEffect(() => {
     if (!selectedTask) {
@@ -587,6 +641,12 @@ export default function Tasks({
                     <dt className="text-muted">Aktuell zuständig</dt>
                     <dd className="text-right font-medium text-ink">{selectedTask.assignee || '—'}</dd>
                   </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted">Workspace-Team</dt>
+                    <dd className="text-right font-medium text-ink">
+                      {loadingTeamMembers ? 'Lädt…' : `${effectiveTeamMembers.length || 1} Mitglied(er)`}
+                    </dd>
+                  </div>
                 </dl>
               </div>
 
@@ -639,12 +699,22 @@ export default function Tasks({
 
                   <div>
                     <label className="mb-1.5 block text-[13px] font-medium text-ink">Zuständig</label>
-                    <input
+                    <select
                       value={draft.assignee}
                       onChange={(event) => setDraft((prev) => ({ ...prev, assignee: event.target.value }))}
                       className={inputClass}
-                      placeholder="Name eintragen"
-                    />
+                    >
+                      <option value="">— Keine Zuständige —</option>
+                      {effectiveTeamMembers.map((member) => {
+                        const label = memberLabel(member)
+                        return label ? (
+                          <option key={member.id || member.email} value={label}>{label}</option>
+                        ) : null
+                      })}
+                    </select>
+                    <p className="mt-1.5 text-[12px] text-muted">
+                      Auswahl aus deinem Workspace-Team. Neue Mitglieder kannst du in den Einstellungen einladen.
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">

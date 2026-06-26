@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import ErrorAlert from './ui/ErrorAlert.jsx'
@@ -9,8 +9,15 @@ const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
+
+function memberLabel(member) {
+  const name = [member?.firstName, member?.lastName].filter(Boolean).join(' ').trim()
+
+  return name || member?.email || ''
+}
+
 /** Modal zum manuellen Anlegen einer Aufgabe (POST /api/tasks). */
-export default function CreateTaskModal({ meetings = [], onClose, onCreated }) {
+export default function CreateTaskModal({ meetings = [], user, onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState('')
   const [deadline, setDeadline] = useState('')
@@ -18,6 +25,46 @@ export default function CreateTaskModal({ meetings = [], onClose, onCreated }) {
   const [meetingId, setMeetingId] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [teamMembers, setTeamMembers] = useState([])
+
+  const fallbackMember = user ? {
+    id: user.id || user.email || 'me',
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: user.role,
+  } : null
+
+  const effectiveTeamMembers = teamMembers.length
+    ? teamMembers
+    : fallbackMember
+      ? [fallbackMember]
+      : []
+
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadTeamMembers() {
+      try {
+        const res = await api.get('/team')
+
+        if (!cancelled) {
+          setTeamMembers(Array.isArray(res.data?.members) ? res.data.members : [])
+        }
+      } catch {
+        if (!cancelled) {
+          setTeamMembers([])
+        }
+      }
+    }
+
+    loadTeamMembers()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -68,7 +115,20 @@ export default function CreateTaskModal({ meetings = [], onClose, onCreated }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label htmlFor="t-assignee" className="mb-1.5 block text-[13px] font-medium text-ink">Zuständig</label>
-              <input id="t-assignee" className={inputClass} value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Name" />
+              <select
+                id="t-assignee"
+                className={inputClass}
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+              >
+                <option value="">— Keine Zuständige —</option>
+                {effectiveTeamMembers.map((member) => {
+                  const label = memberLabel(member)
+                  return label ? (
+                    <option key={member.id || member.email} value={label}>{label}</option>
+                  ) : null
+                })}
+              </select>
             </div>
             <div>
               <label htmlFor="t-deadline" className="mb-1.5 block text-[13px] font-medium text-ink">Deadline</label>
