@@ -44,6 +44,10 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   color-scheme: light;
   font-family: var(--font-sans);
@@ -90,4 +94,40 @@ body {
 
   --color-brand: #4b96d4;
   --color-brand-600: #2b7ec7;
+}
+
+
+::selection {
+  background: rgba(30, 111, 181, 0.18);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 360ms ease-out both;
 }

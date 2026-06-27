@@ -1,6 +1,4 @@
 import { useMemo } from 'react'
-import PageHeader from '../components/ui/PageHeader.jsx'
-import StatCard from '../components/ui/StatCard.jsx'
 import DataCard from '../components/ui/DataCard.jsx'
 import EmptyState from '../components/ui/EmptyState.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
@@ -49,141 +47,307 @@ function byUrgencyThenDeadline(a, b) {
 }
 
 
+
 function WorkBriefingCard({ briefing, onNavigate }) {
   const tone = {
     critical: {
-      className: 'border-red-100 bg-red-50 text-red-800',
-      badgeClass: 'bg-red-100 text-red-700',
+      card: 'border-red-100 bg-red-50/70 text-red-800',
+      badge: 'bg-red-100 text-red-700',
+      label: 'Kritisch',
     },
     warning: {
-      className: 'border-amber-100 bg-amber-50 text-amber-800',
-      badgeClass: 'bg-amber-100 text-amber-700',
+      card: 'border-amber-100 bg-amber-50/70 text-amber-800',
+      badge: 'bg-amber-100 text-amber-700',
+      label: 'Prüfen',
     },
     info: {
-      className: 'border-blue-100 bg-blue-50 text-brand',
-      badgeClass: 'bg-blue-100 text-brand',
+      card: 'border-blue-100 bg-blue-50/70 text-brand',
+      badge: 'bg-blue-100 text-brand',
+      label: 'Hinweis',
     },
     good: {
-      className: 'border-emerald-100 bg-emerald-50 text-emerald-700',
-      badgeClass: 'bg-emerald-100 text-emerald-700',
+      card: 'border-emerald-100 bg-emerald-50/70 text-emerald-700',
+      badge: 'bg-emerald-100 text-emerald-700',
+      label: 'Stabil',
     },
   }[briefing.status] || {
-    className: 'border-line bg-canvas text-ink',
-    badgeClass: 'bg-soft text-muted',
+    card: 'border-line bg-canvas text-ink',
+    badge: 'bg-soft text-muted',
+    label: 'Status',
   }
 
-  const sectionTitleClass = 'text-[13px] font-semibold text-ink'
-  const emptyTextClass = 'text-[12.5px] leading-relaxed text-muted'
+  const previewItems = [
+    {
+      title: 'Akut',
+      value: briefing.todayItems.length,
+      description: briefing.todayItems.length === 0
+        ? 'Keine akuten Aufgaben für heute.'
+        : `${briefing.todayItems.length} Aufgabe(n) brauchen kurzfristig Aufmerksamkeit.`,
+      items: briefing.todayItems.slice(0, 2),
+    },
+    {
+      title: 'Diese Woche',
+      value: briefing.stats.thisWeek,
+      description: briefing.weeklyItems.length === 0
+        ? 'Keine weiteren Wochenaufgaben.'
+        : `${briefing.weeklyItems.length} Aufgabe(n) sind diese Woche relevant.`,
+      items: briefing.weeklyItems.slice(0, 2),
+    },
+    {
+      title: 'Projektfokus',
+      value: briefing.projectRisks.length,
+      description: briefing.projectRisks.length === 0
+        ? 'Keine kritischen Projektakten erkannt.'
+        : `${briefing.projectRisks.length} Projektakte(n) sollten geprüft werden.`,
+      items: briefing.projectRisks.slice(0, 2).map((project) => ({
+        id: project.key,
+        title: project.name,
+        badge: project.criticalTasks > 0 ? `${project.criticalTasks} kritisch` : 'stabil',
+        description: `${project.openTasks} offene Aufgabe(n), ${project.highPriorityTasks} mit hoher Priorität`,
+      })),
+    },
+  ]
 
   return (
     <DataCard
-      title="Tages- und Wochenbriefing"
+      title="Executive Briefing"
       icon={SparklesIcon}
       noPadding
-      action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate(briefing.nextActionPage)}>{briefing.nextActionLabel}</Button>}
+      action={
+        <Button
+          size="sm"
+          variant="ghost"
+          iconRight={ArrowRightIcon}
+          onClick={() => onNavigate(briefing.nextActionPage)}
+        >
+          {briefing.nextActionLabel}
+        </Button>
+      }
     >
-      <div className="border-b border-line px-6 py-5">
-        <div className={`rounded-card border px-5 py-4 ${tone.className}`}>
+      <div className="px-6 py-5">
+        <div className={`rounded-[24px] border px-5 py-4 ${tone.card}`}>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-[18px] font-semibold">{briefing.headline}</p>
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.badgeClass}`}>
-                  {briefing.stats.criticalCount} kritisch
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${tone.badge}`}>
+                  {tone.label}
                 </span>
+                <p className="text-[16px] font-semibold">{briefing.headline}</p>
               </div>
-              <p className="mt-1 text-[13px] leading-relaxed opacity-80">{briefing.summary}</p>
+              <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed opacity-80">
+                {briefing.summary}
+              </p>
             </div>
 
             <Button size="sm" onClick={() => onNavigate(briefing.nextActionPage)}>
-              {briefing.nextActionLabel}
+              Fokus öffnen
             </Button>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 divide-y divide-line lg:grid-cols-3 lg:divide-x lg:divide-y-0">
-        <section className="px-6 py-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className={sectionTitleClass}>Heute / Akut</h3>
-            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
-              {briefing.todayItems.length}
-            </span>
-          </div>
+        {previewItems.map((section) => (
+          <section key={section.title} className="px-6 py-5">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[13px] font-semibold text-ink">{section.title}</h3>
+                <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                  {section.description}
+                </p>
+              </div>
 
-          {briefing.todayItems.length === 0 ? (
-            <p className={emptyTextClass}>Keine akuten Aufgaben für heute.</p>
-          ) : (
-            <ul className="space-y-3">
-              {briefing.todayItems.map((item) => (
-                <li key={item.id} className="rounded-button border border-line bg-canvas px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 text-[13px] font-semibold text-ink">{item.title}</p>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10.5px] font-semibold text-muted">
-                      {item.badge}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted">{item.description}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+              <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-soft px-2 text-[12px] font-semibold text-muted">
+                {section.value}
+              </span>
+            </div>
 
-        <section className="px-6 py-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className={sectionTitleClass}>Diese Woche</h3>
-            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
-              {briefing.stats.thisWeek}
-            </span>
-          </div>
-
-          {briefing.weeklyItems.length === 0 ? (
-            <p className={emptyTextClass}>Keine weiteren Aufgaben mit Deadline in dieser Woche.</p>
-          ) : (
-            <ul className="space-y-3">
-              {briefing.weeklyItems.map((item) => (
-                <li key={item.id} className="rounded-button border border-line bg-surface px-4 py-3">
-                  <p className="text-[13px] font-semibold text-ink">{item.title}</p>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted">{item.description}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="px-6 py-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h3 className={sectionTitleClass}>Projektfokus</h3>
-            <span className="rounded-full bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
-              {briefing.projectRisks.length}
-            </span>
-          </div>
-
-          {briefing.projectRisks.length === 0 ? (
-            <p className={emptyTextClass}>Keine kritischen Projektakten erkannt.</p>
-          ) : (
-            <ul className="space-y-3">
-              {briefing.projectRisks.map((project) => (
-                <li key={project.key} className="rounded-button border border-line bg-surface px-4 py-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <p className="min-w-0 text-[13px] font-semibold text-ink">{project.name}</p>
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
-                      project.criticalTasks > 0 ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'
-                    }`}>
-                      {project.criticalTasks > 0 ? `${project.criticalTasks} kritisch` : 'stabil'}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-muted">
-                    {project.openTasks} offene Aufgabe(n), {project.highPriorityTasks} mit hoher Priorität
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            {section.items.length === 0 ? (
+              <div className="rounded-2xl border border-line bg-canvas/70 px-4 py-3">
+                <p className="text-[12.5px] leading-relaxed text-muted">
+                  Kein Handlungsbedarf in diesem Bereich.
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-2.5">
+                {section.items.map((item) => (
+                  <li key={item.id} className="rounded-2xl border border-line bg-canvas/70 px-4 py-3 transition hover:bg-surface">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 text-[13px] font-semibold text-ink">
+                        {item.title}
+                      </p>
+                      {item.badge ? (
+                        <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10.5px] font-semibold text-muted">
+                          {item.badge}
+                        </span>
+                      ) : null}
+                    </div>
+                    {item.description ? (
+                      <p className="mt-1 text-[12px] leading-relaxed text-muted">
+                        {item.description}
+                      </p>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ))}
       </div>
     </DataCard>
+  )
+}
+
+
+
+function DashboardHero({
+  firstName,
+  meetingsCount,
+  openTasks,
+  deadlineStats,
+  unassignedCount,
+  onNewMeeting,
+  onNavigate,
+}) {
+  const hasUrgency = deadlineStats.overdue > 0 || deadlineStats.today > 0 || unassignedCount > 0
+
+  const focusHeadline = deadlineStats.overdue > 0
+    ? `${deadlineStats.overdue} Aufgabe(n) brauchen Aufmerksamkeit`
+    : deadlineStats.today > 0
+      ? `${deadlineStats.today} Aufgabe(n) sind heute fällig`
+      : unassignedCount > 0
+        ? `${unassignedCount} Aufgabe(n) brauchen eine Zuständige`
+        : 'Dein Workspace ist aktuell ruhig'
+
+  const focusDescription = deadlineStats.overdue > 0
+    ? 'Prüfe zuerst die überfälligen Aufgaben und entscheide, ob sie erledigt oder neu geplant werden müssen.'
+    : deadlineStats.today > 0
+      ? 'Heute gibt es Aufgaben, die aktiv priorisiert oder abgeschlossen werden sollten.'
+      : unassignedCount > 0
+        ? 'Einige Aufgaben sind noch keiner Person zugeordnet und könnten sonst liegen bleiben.'
+        : 'Es gibt aktuell keine kritischen Aufgaben im Arbeitsfokus.'
+
+  return (
+    <section className="relative overflow-hidden rounded-[34px] border border-line/80 bg-surface/86 p-6 shadow-card backdrop-blur-xl sm:p-7 lg:p-8">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand/12 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-accent/10 blur-3xl" />
+
+      <div className="relative grid gap-7 lg:grid-cols-[1.5fr_0.85fr] lg:items-center">
+        <div>
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-line bg-canvas/80 px-3 py-1.5 text-[11.5px] font-semibold uppercase tracking-[0.16em] text-muted">
+            <SparklesIcon size={14} className="text-brand" />
+            MeetingMind Workspace
+          </div>
+
+          <h1 className="max-w-3xl text-[34px] font-semibold tracking-[-0.045em] text-ink sm:text-[40px] lg:text-[44px]">
+            Guten Tag, {firstName}
+          </h1>
+
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-muted">
+            Behalte Entscheidungen, Aufgaben und offene Fragen aus deinen Meetings im Blick – von der Analyse bis zur Umsetzung.
+          </p>
+
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <Button icon={PlusIcon} onClick={onNewMeeting}>
+              Neues Meeting
+            </Button>
+            <Button variant="secondary" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>
+              Aufgaben prüfen
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative rounded-[26px] border border-line bg-canvas/70 p-5 shadow-soft">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">
+                Heute im Fokus
+              </p>
+              <h2 className="mt-2 text-[20px] font-semibold tracking-tight text-ink">
+                {focusHeadline}
+              </h2>
+            </div>
+
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+              hasUrgency
+                ? 'bg-amber-50 text-amber-700'
+                : 'bg-emerald-50 text-emerald-700'
+            }`}>
+              {hasUrgency ? 'Prüfen' : 'Stabil'}
+            </span>
+          </div>
+
+          <p className="mt-3 text-[13px] leading-relaxed text-muted">
+            {focusDescription}
+          </p>
+
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-line bg-surface px-3 py-3">
+              <p className="text-[20px] font-semibold text-ink">{meetingsCount}</p>
+              <p className="mt-0.5 text-[11.5px] text-muted">Meetings</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-surface px-3 py-3">
+              <p className="text-[20px] font-semibold text-ink">{openTasks}</p>
+              <p className="mt-0.5 text-[11.5px] text-muted">Offen</p>
+            </div>
+            <div className="rounded-2xl border border-line bg-surface px-3 py-3">
+              <p className="text-[20px] font-semibold text-ink">{deadlineStats.overdue}</p>
+              <p className="mt-0.5 text-[11.5px] text-muted">Überfällig</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+
+function MetricCard({ icon: Icon, label, value, description, tone = 'neutral' }) {
+  const toneClass = {
+    critical: {
+      icon: 'bg-red-50 text-red-700',
+      value: 'text-red-700',
+      ring: 'hover:border-red-100',
+    },
+    warning: {
+      icon: 'bg-amber-50 text-amber-700',
+      value: 'text-amber-700',
+      ring: 'hover:border-amber-100',
+    },
+    info: {
+      icon: 'bg-blue-50 text-brand',
+      value: 'text-ink',
+      ring: 'hover:border-blue-100',
+    },
+    neutral: {
+      icon: 'bg-soft text-muted',
+      value: 'text-ink',
+      ring: 'hover:border-line',
+    },
+  }[tone] || {
+    icon: 'bg-soft text-muted',
+    value: 'text-ink',
+    ring: 'hover:border-line',
+  }
+
+  return (
+    <div className={`group rounded-[26px] border border-line/80 bg-surface/86 p-5 shadow-soft backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-card ${toneClass.ring}`}>
+      <div className="flex items-start justify-between gap-4">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass.icon}`}>
+          <Icon size={18} />
+        </span>
+
+        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">
+          Live
+        </span>
+      </div>
+
+      <p className={`mt-5 text-[32px] font-semibold tracking-[-0.045em] ${toneClass.value}`}>
+        {value}
+      </p>
+      <p className="mt-1 text-[13px] font-semibold text-ink">{label}</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{description}</p>
+    </div>
   )
 }
 
@@ -238,33 +402,61 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
 
   return (
     <div className="space-y-7">
-      <PageHeader
-        title={`Guten Tag, ${firstName}`}
-        subtitle="Dein Arbeitsfokus für Meetings, Aufgaben und Follow-ups."
-        actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neues Meeting</Button>}
+      <DashboardHero
+        firstName={firstName}
+        meetingsCount={meetings.length}
+        openTasks={stats.openTasks}
+        deadlineStats={deadlineStats}
+        unassignedCount={unassignedTasks.length}
+        onNewMeeting={onNewMeeting}
+        onNavigate={onNavigate}
       />
 
       <WorkBriefingCard briefing={workBriefing} onNavigate={onNavigate} />
 
       {/* KPI-Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={ClockIcon} label="Überfällig" value={deadlineStats.overdue} accent="bg-red-50 text-red-700" />
-        <StatCard icon={CalendarIcon} label="Heute fällig" value={deadlineStats.today} accent="bg-amber-50 text-amber-700" />
-        <StatCard icon={CheckCircleIcon} label="Offene Aufgaben" value={stats.openTasks} accent="bg-soft text-muted" />
-        <StatCard icon={ClockIcon} label="Ohne Zuständige" value={unassignedTasks.length} accent="bg-amber-50 text-amber-700" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          icon={ClockIcon}
+          label="Überfällig"
+          value={deadlineStats.overdue}
+          description="Sollten zuerst geprüft oder neu geplant werden."
+          tone={deadlineStats.overdue > 0 ? 'critical' : 'neutral'}
+        />
+        <MetricCard
+          icon={CalendarIcon}
+          label="Heute fällig"
+          value={deadlineStats.today}
+          description="Aufgaben, die heute aktiv relevant sind."
+          tone={deadlineStats.today > 0 ? 'warning' : 'neutral'}
+        />
+        <MetricCard
+          icon={CheckCircleIcon}
+          label="Offene Aufgaben"
+          value={stats.openTasks}
+          description="Noch nicht abgeschlossene Action Items."
+          tone="info"
+        />
+        <MetricCard
+          icon={ClockIcon}
+          label="Ohne Zuständige"
+          value={unassignedTasks.length}
+          description="Brauchen eine klare Verantwortlichkeit."
+          tone={unassignedTasks.length > 0 ? 'warning' : 'neutral'}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           {/* Action Hub */}
           <DataCard
-            title="Heute wichtig"
+            title="Arbeitsfokus"
             icon={CheckCircleIcon}
             noPadding
-            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Aufgaben öffnen</Button>}
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Aufgaben</Button>}
           >
             <div className="border-b border-line px-6 py-5">
-              <div className="rounded-card border border-line bg-canvas p-5">
+              <div className="rounded-[24px] border border-line bg-canvas/70 p-5 shadow-soft">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-[18px] font-semibold text-ink">{actionHeadline}</p>
@@ -287,9 +479,9 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                 </div>
               </div>
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="space-y-3 px-6 py-5">
                 {actionTasks.map((task) => (
-                  <li key={task.id} className="px-6 py-4 transition hover:bg-canvas">
+                  <li key={task.id} className="rounded-[20px] border border-line bg-canvas/70 px-4 py-3 transition hover:bg-surface hover:shadow-soft">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
@@ -336,7 +528,7 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
             title="Letzte Meetings"
             icon={ListIcon}
             noPadding
-            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('meetings')}>Alle ansehen</Button>}
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('meetings')}>Meetings</Button>}
           >
             {loading ? (
               <div className="px-6 py-12 text-center text-[14px] text-muted">Wird geladen…</div>
@@ -348,9 +540,9 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                 action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>}
               />
             ) : (
-              <ul className="divide-y divide-line">
+              <ul className="space-y-3 px-6 py-5">
                 {recent.map((meeting) => (
-                  <li key={meeting.id} className="flex items-center gap-4 px-6 py-4 transition hover:bg-canvas">
+                  <li key={meeting.id} className="flex items-center gap-4 rounded-[20px] border border-line bg-canvas/70 px-4 py-3 transition hover:bg-surface hover:shadow-soft">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy/5 text-navy">
                       <FileTextIcon size={18} />
                     </span>
@@ -506,14 +698,14 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
             </span>
             <h3 className="relative mt-4 text-[15px] font-semibold">Schnellaktionen</h3>
             <p className="relative mt-1.5 text-[13px] leading-relaxed text-white/70">
-              Starte ein Meeting mit Vorlage oder prüfe deine Aufgaben.
+              Starte ein neues Meeting oder prüfe direkt deinen aktuellen Arbeitsfokus.
             </p>
             <div className="relative mt-5 flex flex-col gap-2">
               <button
                 onClick={onNewMeeting}
                 className="inline-flex items-center justify-center gap-2 rounded-button bg-white px-4 py-2.5 text-[13px] font-semibold text-navy transition hover:bg-white/90"
               >
-                <PlusIcon size={16} /> Neues Meeting erstellen
+                <PlusIcon size={16} /> Neues Meeting
               </button>
               <button
                 onClick={() => onNavigate('tasks')}
