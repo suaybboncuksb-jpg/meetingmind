@@ -18,36 +18,94 @@ const TABS = [
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 
-function MeetingRow({ meeting, onOpen }) {
+
+function MeetingMetric({ icon: Icon, label, value, description, tone = 'neutral' }) {
+  const toneClass = {
+    brand: 'bg-brand/10 text-brand',
+    navy: 'bg-navy/5 text-navy',
+    amber: 'bg-amber-50 text-amber-700',
+    emerald: 'bg-emerald-50 text-emerald-700',
+    neutral: 'bg-soft text-muted',
+  }[tone] || 'bg-soft text-muted'
+
   return (
-    <li className="flex flex-col gap-3 px-6 py-4 transition hover:bg-canvas sm:flex-row sm:items-center">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-navy/5 text-navy">
-        <FileTextIcon size={18} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="truncate text-[14px] font-medium text-ink">{meeting.title || 'Ohne Titel'}</p>
-          {meeting.projectName ? (
-            <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand">
-              {meeting.projectName}
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted">
-          <span className="inline-flex items-center gap-1.5"><CalendarIcon size={14} />{formatDate(meetingDateOf(meeting))}</span>
-          <span className="inline-flex items-center gap-1.5"><UsersIcon size={14} />— Teilnehmer</span>
-          <span className="inline-flex items-center gap-1.5"><CheckSquareIcon size={14} />{taskCountOf(meeting)} Aufgaben</span>
-        </div>
+    <div className="rounded-[24px] border border-line/80 bg-surface/86 p-5 shadow-soft backdrop-blur-xl transition hover:-translate-y-0.5 hover:shadow-card">
+      <div className="flex items-start justify-between gap-4">
+        <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}>
+          <Icon size={18} />
+        </span>
+        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">
+          Live
+        </span>
       </div>
-      <div className="flex items-center gap-3 sm:justify-end">
-        <StatusBadge status={meeting.status} />
-        <Button size="sm" variant="secondary" iconRight={ArrowRightIcon} onClick={() => onOpen(meeting)}>
-          Details ansehen
-        </Button>
+
+      <p className="mt-5 text-[30px] font-semibold tracking-[-0.045em] text-ink">{value}</p>
+      <p className="mt-1 text-[13px] font-semibold text-ink">{label}</p>
+      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">{description}</p>
+    </div>
+  )
+}
+
+
+function MeetingRow({ meeting, onOpen }) {
+  const taskCount = taskCountOf(meeting)
+  const description = String(meeting.description || '').trim()
+  const hasDescription = Boolean(description)
+  const dateLabel = formatDate(meetingDateOf(meeting))
+
+  return (
+    <li className="rounded-[22px] border border-line bg-canvas/70 px-4 py-4 transition hover:bg-surface hover:shadow-soft">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 gap-4">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-navy/5 text-navy">
+            <FileTextIcon size={18} />
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="truncate text-[15px] font-semibold tracking-tight text-ink">
+                {meeting.title || 'Ohne Titel'}
+              </p>
+
+              {meeting.projectName ? (
+                <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand">
+                  {meeting.projectName}
+                </span>
+              ) : null}
+            </div>
+
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <CalendarIcon size={14} />
+                {dateLabel}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <UsersIcon size={14} />
+                — Teilnehmer
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <CheckSquareIcon size={14} />
+                {taskCount} Aufgabe(n)
+              </span>
+            </div>
+
+            <p className="mt-2 max-w-2xl truncate text-[12.5px] leading-relaxed text-muted">
+              {hasDescription ? description : 'Noch keine Agenda oder Beschreibung hinterlegt.'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3 lg:justify-end">
+          <StatusBadge status={meeting.status} />
+          <Button size="sm" variant="secondary" iconRight={ArrowRightIcon} onClick={() => onOpen(meeting)}>
+            Details
+          </Button>
+        </div>
       </div>
     </li>
   )
 }
+
 
 function CalendarView({ meetings, onOpen }) {
   const today = new Date()
@@ -127,29 +185,82 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
   const drafts = useMemo(() => searchableMeetings.filter((m) => m.status === 'DRAFT'), [searchableMeetings])
   const selected = meetings.find((m) => m.id === selectedId) || null
 
+  const meetingStats = useMemo(() => {
+    const analyzedStatuses = new Set(['ANALYZED', 'COMPLETED'])
+    const failedStatuses = new Set(['ANALYSIS_FAILED'])
+
+    return {
+      total: sorted.length,
+      drafts: sorted.filter((m) => m.status === 'DRAFT').length,
+      analyzed: sorted.filter((m) => analyzedStatuses.has(String(m.status || '').toUpperCase())).length,
+      failed: sorted.filter((m) => failedStatuses.has(String(m.status || '').toUpperCase())).length,
+      tasks: sorted.reduce((sum, meeting) => sum + taskCountOf(meeting), 0),
+    }
+  }, [sorted])
+
   const list = tab === 'drafts' ? drafts : searchableMeetings
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Meetings"
-        subtitle="Alle Meetings, Kalenderansicht und Entwürfe an einem Ort."
+        subtitle="Plane, analysiere und dokumentiere deine Meetings an einem zentralen Ort."
         actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neues Meeting</Button>}
       />
 
-      <Tabs tabs={TABS} value={tab} onChange={setTab} />
-
-      <div className="rounded-card border border-line bg-surface p-4 shadow-soft">
-        <label htmlFor="meeting-search" className="mb-1.5 block text-[13px] font-medium text-ink">
-          Meetings durchsuchen
-        </label>
-        <input
-          id="meeting-search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Suche nach Titel, Projekt/Kunde, Beschreibung oder Status…"
-          className="w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MeetingMetric
+          icon={CalendarIcon}
+          label="Alle Meetings"
+          value={meetingStats.total}
+          description="Gesamte Meeting-Historie im Workspace."
+          tone="navy"
         />
+        <MeetingMetric
+          icon={FileTextIcon}
+          label="Entwürfe"
+          value={meetingStats.drafts}
+          description="Meetings, die noch nicht analysiert wurden."
+          tone={meetingStats.drafts > 0 ? 'amber' : 'neutral'}
+        />
+        <MeetingMetric
+          icon={CheckSquareIcon}
+          label="Analysiert"
+          value={meetingStats.analyzed}
+          description="Meetings mit gespeicherter KI-Nachbereitung."
+          tone="emerald"
+        />
+        <MeetingMetric
+          icon={CheckSquareIcon}
+          label="Aufgaben"
+          value={meetingStats.tasks}
+          description="Erkannte oder manuell angelegte Action Items."
+          tone="brand"
+        />
+      </div>
+
+      <div className="rounded-[26px] border border-line/80 bg-surface/86 p-4 shadow-soft backdrop-blur-xl">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="min-w-0">
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">
+              Meeting Library
+            </p>
+            <Tabs tabs={TABS} value={tab} onChange={setTab} />
+          </div>
+
+          <div className="w-full xl:max-w-md">
+            <label htmlFor="meeting-search" className="mb-1.5 block text-[13px] font-medium text-ink">
+              Meetings durchsuchen
+            </label>
+            <input
+              id="meeting-search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Titel, Projekt/Kunde, Beschreibung oder Status…"
+              className="w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
+            />
+          </div>
+        </div>
       </div>
 
       <DataCard noPadding>
@@ -170,7 +281,7 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
             action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>}
           />
         ) : (
-          <ul className="divide-y divide-line">
+          <ul className="space-y-3 p-4 sm:p-5">
             {list.map((m) => <MeetingRow key={m.id} meeting={m} onOpen={(mm) => setSelectedId(mm.id)} />)}
           </ul>
         )}
