@@ -78,10 +78,8 @@ body {
 /* ------------------------------------------------------------------ */
 :root.dark {
   color-scheme: dark;
-
   --color-ink: #e6e9ef;        /* primärer Text */
   --color-muted: #94a3b8;      /* sekundärer Text */
-
   --color-canvas: #f8f7f5;     /* App-Hintergrund */
   --color-surface: #121a2a;    /* Cards */
   --color-soft: #f1efeb;       /* ruhige Flächen */
@@ -91,11 +89,9 @@ body {
   --color-navy: #2b7ec7;
   --color-navy-600: #4b96d4;
   --color-navy-700: #1e6fb5;
-
   --color-brand: #4b96d4;
   --color-brand-600: #2b7ec7;
 }
-
 
 ::selection {
   background: rgba(30, 111, 181, 0.18);
@@ -121,7 +117,6 @@ button:disabled {
     opacity: 0;
     transform: translateY(8px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -130,4 +125,12 @@ button:disabled {
 
 .animate-fade-in {
   animation: fade-in 360ms ease-out both;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Task-Detailansicht — dunkler Verlauf statt pale/kalt-blauem        */
+/*  Overlay, für mehr Tiefe und Wärme hinter dem Modal.                */
+/* ------------------------------------------------------------------ */
+.task-detail-overlay {
+  background: linear-gradient(160deg, rgba(24, 26, 36, 0.82), rgba(13, 14, 20, 0.92));
 }

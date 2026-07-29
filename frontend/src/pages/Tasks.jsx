@@ -602,7 +602,7 @@ export default function Tasks({
 
       {selectedTask && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/40 px-4 py-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center task-detail-overlay px-4 py-6 backdrop-blur-sm"
           onClick={() => setSelectedTaskId(null)}
         >
           <div
