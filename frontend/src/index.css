@@ -15,10 +15,10 @@
   --color-muted: #667085;      /* sekundärer Text */
 
   /* Flächen */
-  --color-canvas: #f8fafc;     /* App-Hintergrund */
+  --color-canvas: #f8f7f5;     /* App-Hintergrund */
   --color-surface: #ffffff;    /* Cards */
-  --color-soft: #eef2f6;       /* ruhige Flächen */
-  --color-line: #e5e7eb;       /* Borders */
+  --color-soft: #f1efeb;       /* ruhige Flächen */
+  --color-line: #e3ded6;       /* Borders */
 
   /* Radien */
   --radius-card: 1.5rem;       /* 24px */
@@ -82,10 +82,10 @@ body {
   --color-ink: #e6e9ef;        /* primärer Text */
   --color-muted: #94a3b8;      /* sekundärer Text */
 
-  --color-canvas: #0b1220;     /* App-Hintergrund */
+  --color-canvas: #f8f7f5;     /* App-Hintergrund */
   --color-surface: #121a2a;    /* Cards */
-  --color-soft: #1b2536;       /* ruhige Flächen */
-  --color-line: #25324a;       /* Borders */
+  --color-soft: #f1efeb;       /* ruhige Flächen */
+  --color-line: #e3ded6;       /* Borders */
 
   /* Navy = Primärfläche: im Dark Mode aufgehellt, damit Buttons sichtbar bleiben */
   --color-navy: #2b7ec7;

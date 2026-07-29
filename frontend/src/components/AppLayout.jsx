@@ -24,9 +24,9 @@ export default function AppLayout({ user, current, onNavigate, onLogout, childre
   return (
     <div className="relative min-h-screen overflow-hidden bg-canvas">
       <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute left-[280px] top-[-160px] h-[360px] w-[360px] rounded-full bg-brand/10 blur-3xl" />
-        <div className="absolute bottom-[-220px] right-[-120px] h-[420px] w-[420px] rounded-full bg-accent/10 blur-3xl" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(30,111,181,0.08),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.36),transparent_26%)] dark:bg-[radial-gradient(circle_at_top_left,rgba(75,150,212,0.10),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_26%)]" />
+        <div className="absolute left-[280px] top-[-160px] h-[360px] w-[360px] rounded-full bg-[#eadfce]/45 blur-3xl" />
+        <div className="absolute bottom-[-220px] right-[-120px] h-[420px] w-[420px] rounded-full bg-[#ded6c8]/40 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(234,223,206,0.34),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(222,214,200,0.28),transparent_32%),linear-gradient(180deg,#fbfaf8_0%,#f8f7f5_42%,#f1efeb_100%)] before:absolute before:inset-0 before:bg-[radial-gradient(circle,rgba(13,33,55,0.035)_1px,transparent_1px)] before:[background-size:18px_18px] before:opacity-[0.22] dark:bg-[radial-gradient(circle_at_top_left,rgba(75,150,212,0.10),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_26%)] dark:before:hidden" />
       </div>
 
       {/* Desktop-Sidebar */}

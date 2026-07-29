@@ -602,31 +602,42 @@ export default function Tasks({
 
       {selectedTask && (
         <div
-          className="fixed inset-0 z-[70] flex justify-end bg-navy/25 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/40 px-4 py-6 backdrop-blur-sm"
           onClick={() => setSelectedTaskId(null)}
         >
-          <aside
-            className="h-full w-full max-w-md overflow-y-auto border-l border-line bg-surface p-6 shadow-card"
+          <div
+            className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-card border border-line bg-surface shadow-card"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Aufgabendetails</p>
-                <h2 className="mt-1 text-[20px] font-semibold tracking-tight text-ink">
-                  {selectedTask.title || 'Ohne Titel'}
-                </h2>
+            <div className="border-b border-line px-6 py-5">
+              <div className="flex items-start justify-between gap-5">
+                <div className="min-w-0">
+                  <p className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-muted">
+                    Aufgabendetails
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    <h2 className="truncate text-[20px] font-semibold tracking-tight text-ink">
+                      {selectedTask.title || 'Ohne Titel'}
+                    </h2>
+                    <StatusBadge status={selectedTask.status} />
+                  </div>
+                  <p className="mt-2 text-[13px] text-muted">
+                    {selectedTask.meetingTitle ? `Meeting: ${selectedTask.meetingTitle}` : 'Kein Meeting verknüpft'}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskId(null)}
+                  className="rounded-lg p-1.5 text-muted transition hover:bg-soft hover:text-ink"
+                  aria-label="Schließen"
+                >
+                  <XIcon size={18} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTaskId(null)}
-                className="rounded-lg p-1.5 text-muted transition hover:bg-soft hover:text-ink"
-                aria-label="Schließen"
-              >
-                <XIcon size={18} />
-              </button>
             </div>
 
-            <div className="mt-6 space-y-4">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-surface px-6 py-5">
               <div className="rounded-card border border-line bg-canvas p-4">
                 <dl className="space-y-3 text-[13px]">
                   <div className="flex justify-between gap-4">
@@ -662,6 +673,7 @@ export default function Tasks({
                       Ändere Verantwortlichkeit, Deadline, Priorität oder Status direkt hier.
                     </p>
                   </div>
+
                   {isUnassignedTask(selectedTask) && selectedTask.status !== 'DONE' ? (
                     <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                       Offen
@@ -840,9 +852,10 @@ export default function Tasks({
                 </form>
               </div>
             </div>
-          </aside>
+          </div>
         </div>
       )}
+
     </div>
   )
 }
