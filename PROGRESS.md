@@ -41,6 +41,13 @@
 - Backup-Branches gelöscht (lokal + remote)
 - Offene UI-Änderungen committed (Tasks, AppLayout, MeetingDetail, index.css)
 
+### 2026-07-30
+- Task-Detailansicht: Hintergrund-Overlay auf dunklen Verlauf umgestellt (Issue #8, Branch `style/8-taskdetail-background`, gepusht, noch nicht gemerged)
+- Dabei CORS-Bug im Backend gefunden und gefixt: `SecurityConfig.java` erlaubte nur Port 5173/3000, neuer Vite-Port 5175 fehlte → Ports 5174–5176 ergänzt
+- Erkenntnis: Der dunkle Verlauf sieht gut aus, aber andere Modals (z.B. "Neues Meeting") nutzen noch einen anderen, hellen Overlay-Stil → uneinheitlich
+- **Nächster Schritt:** Alle Modal-Overlays im Frontend finden (`grep -rn "fixed inset-0" frontend/src`) und einheitlich auf den dunklen Verlauf umstellen — dabei ggf. CSS-Klasse `task-detail-overlay` in `modal-overlay` umbenennen, da sie dann global gilt
+- Noch offen: PR für Issue #8 mergen (aktuell nur gepusht, nicht gemerged) — eventuell erst mergen, wenn die Vereinheitlichung auf allen Modals fertig ist
+
 <!--
 ### YYYY-MM-DD
 - Was wurde gemacht
