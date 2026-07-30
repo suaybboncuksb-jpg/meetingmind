@@ -10,6 +10,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Meetings from './pages/Meetings.jsx'
 import MeetingDetail from './components/MeetingDetail.jsx'
 import Tasks from './pages/Tasks.jsx'
+import TaskDetail from './components/TaskDetail.jsx'
 import Projects from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
 import AppLayout from './components/AppLayout.jsx'
@@ -28,6 +29,7 @@ function App() {
 
   const [page, setPage] = useState('dashboard')
   const [selectedMeetingId, setSelectedMeetingId] = useState(null)
+  const [selectedTaskId, setSelectedTaskId] = useState(null)
   const [meetings, setMeetings] = useState([])
   const [tasks, setTasks] = useState([])
   const [loadingMeetings, setLoadingMeetings] = useState(true)
@@ -48,6 +50,7 @@ function App() {
     setTasks([])
     setPage('dashboard')
     setSelectedMeetingId(null)
+    setSelectedTaskId(null)
     setShowCreate(false)
     setShowCreateTask(false)
     setLoadingMeetings(false)
@@ -118,9 +121,30 @@ function App() {
     loadTasks()
   }
 
+  const handleMeetingDeleted = async (meetingId) => {
+    await api.delete(`/meetings/${meetingId}`)
+    setMeetings((prev) => prev.filter((m) => m.id !== meetingId))
+    loadTasks()
+
+    if (selectedMeetingId === meetingId) {
+      setSelectedMeetingId(null)
+      setPage('meetings')
+    }
+  }
+
   const handleTaskCreated = (task) => {
     setTasks((prev) => [task, ...prev])
     setShowCreateTask(false)
+  }
+
+  const handleTaskDeleted = async (taskId) => {
+    await api.delete(`/tasks/${taskId}`)
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+
+    if (selectedTaskId === taskId) {
+      setSelectedTaskId(null)
+      setPage('tasks')
+    }
   }
 
   const handleTaskStatus = async (taskId, status) => {
@@ -211,6 +235,16 @@ function App() {
     setPage('meetings')
   }
 
+  const handleOpenTask = (taskId) => {
+    setSelectedTaskId(taskId)
+    setPage('taskDetail')
+  }
+
+  const handleCloseTaskDetail = () => {
+    setSelectedTaskId(null)
+    setPage('tasks')
+  }
+
   const pages = {
     dashboard: (
       <Dashboard
@@ -228,6 +262,7 @@ function App() {
         loading={loadingMeetings}
         onNewMeeting={openCreate}
         onOpenMeeting={handleOpenMeeting}
+        onDeleteMeeting={handleMeetingDeleted}
       />
     ),
     meetingDetail: (
@@ -236,17 +271,26 @@ function App() {
         onClose={handleCloseMeetingDetail}
         onUpdated={handleMeetingUpdated}
         onTaskCreated={handleTaskCreated}
+        onDelete={handleMeetingDeleted}
       />
     ),
     tasks: (
       <Tasks
-        user={user}
         tasks={tasks}
         onStatusChange={handleTaskStatus}
-        onTaskAssigneeChange={handleTaskAssigneeChange}
-        onTaskUpdate={handleTaskUpdate}
         onNewTask={() => setShowCreateTask(true)}
         onNavigate={setPage}
+        onOpenTask={handleOpenTask}
+      />
+    ),
+    taskDetail: (
+      <TaskDetail
+        task={tasks.find((t) => t.id === selectedTaskId)}
+        user={user}
+        onClose={handleCloseTaskDetail}
+        onTaskUpdate={handleTaskUpdate}
+        onTaskAssigneeChange={handleTaskAssigneeChange}
+        onDelete={handleTaskDeleted}
       />
     ),
     projects: (
@@ -259,9 +303,14 @@ function App() {
     settings: <Settings user={user} theme={theme} onThemeChange={setTheme} />,
   }
 
+  const sidebarActivePage =
+    page === 'meetingDetail' ? 'meetings' :
+    page === 'taskDetail' ? 'tasks' :
+    page
+
   return (
     <>
-      <AppLayout user={user} current={page} onNavigate={setPage} onLogout={handleLogout}>
+      <AppLayout user={user} current={sidebarActivePage} onNavigate={setPage} onLogout={handleLogout}>
         {pages[page] || pages.dashboard}
       </AppLayout>
 

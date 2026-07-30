@@ -117,3 +117,7 @@ export const FlagIcon = (p) => (
 export const UserIcon = (p) => (
   <Icon {...p}><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></Icon>
 )
+
+export const ShieldIcon = (p) => (
+  <Icon {...p}><path d="M12 3l7 3v5c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3Z" /><path d="M9 12l2 2 4-4" /></Icon>
+)

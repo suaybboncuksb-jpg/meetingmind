@@ -43,7 +43,7 @@ function MeetingMetric({ icon: Icon, label, value, description, tone = 'neutral'
 }
 
 
-function MeetingRow({ meeting, onOpen }) {
+function MeetingRow({ meeting, onOpen, onDelete }) {
   const taskCount = taskCountOf(meeting)
   const description = String(meeting.description || '').trim()
   const hasDescription = Boolean(description)
@@ -93,6 +93,17 @@ function MeetingRow({ meeting, onOpen }) {
 
         <div className="flex shrink-0 items-center gap-3 lg:justify-end">
           <StatusBadge status={meeting.status} />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              if (window.confirm(`„${meeting.title || 'Diese Besprechung'}“ wirklich unwiderruflich löschen?`)) {
+                onDelete(meeting.id)
+              }
+            }}
+          >
+            Löschen
+          </Button>
           <Button size="sm" variant="secondary" iconRight={ArrowRightIcon} onClick={() => onOpen(meeting)}>
             Details
           </Button>
@@ -163,7 +174,7 @@ function CalendarView({ meetings, onOpen }) {
   )
 }
 
-export default function Meetings({ meetings = [], loading, onNewMeeting, onOpenMeeting }) {
+export default function Meetings({ meetings = [], loading, onNewMeeting, onOpenMeeting, onDeleteMeeting }) {
   const [tab, setTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -276,7 +287,14 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onOpenM
           />
         ) : (
           <ul className="space-y-3 p-4 sm:p-5">
-            {list.map((m) => <MeetingRow key={m.id} meeting={m} onOpen={(mm) => onOpenMeeting(mm.id)} />)}
+            {list.map((m) => (
+              <MeetingRow
+                key={m.id}
+                meeting={m}
+                onOpen={(mm) => onOpenMeeting(mm.id)}
+                onDelete={onDeleteMeeting}
+              />
+            ))}
           </ul>
         )}
       </DataCard>

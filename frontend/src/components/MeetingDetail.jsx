@@ -137,7 +137,7 @@ function PreviewList({ title, items = [], empty = 'Keine Einträge erkannt.' }) 
   )
 }
 
-export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreated }) {
+export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreated, onDelete }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [transcript, setTranscript] = useState(meeting?.transcript || '')
   const [analyzing, setAnalyzing] = useState(false)
@@ -154,6 +154,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
   const [loadingAnalysisDetails, setLoadingAnalysisDetails] = useState(false)
   const [creatingQuestionTask, setCreatingQuestionTask] = useState('')
   const [questionTaskSuccess, setQuestionTaskSuccess] = useState('')
+  const [deleting, setDeleting] = useState(false)
 
   const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
   const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
@@ -368,16 +369,38 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
     }
   }
 
+  async function handleDeleteMeeting() {
+    if (!window.confirm(`„${meeting.title || 'Diese Besprechung'}“ wirklich unwiderruflich löschen?`)) {
+      return
+    }
+
+    setDeleting(true)
+    setError('')
+
+    try {
+      await onDelete(meeting.id)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Besprechung konnte nicht gelöscht werden.'))
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
-      <button
-        type="button"
-        onClick={onClose}
-        className="inline-flex items-center gap-2 text-[13px] font-semibold text-muted transition hover:text-ink"
-      >
-        <ArrowLeftIcon size={16} />
-        Zurück zu Besprechungen
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-2 text-[13px] font-semibold text-muted transition hover:text-ink"
+        >
+          <ArrowLeftIcon size={16} />
+          Zurück zu Besprechungen
+        </button>
+
+        <Button size="sm" variant="secondary" onClick={handleDeleteMeeting} disabled={deleting}>
+          {deleting ? 'Wird gelöscht…' : 'Besprechung löschen'}
+        </Button>
+      </div>
 
       <div className="rounded-[34px] border border-line/80 bg-surface/86 shadow-card backdrop-blur-xl">
         <header className="border-b border-line px-6 py-5">

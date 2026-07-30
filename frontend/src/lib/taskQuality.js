@@ -34,7 +34,7 @@ export function evaluateTaskQuality(task) {
     return {
       score: 0,
       level: 'critical',
-      label: 'Kritisch',
+      label: 'Verbesserung nötig',
       summary: 'Diese Aufgabe kann nicht bewertet werden.',
       issues: [
         createIssue(
@@ -73,7 +73,7 @@ export function evaluateTaskQuality(task) {
       score -= 20
       issues.push(createIssue(
         'Titel ist zu kurz',
-        'Der Titel sollte konkreter beschreiben, welches Ergebnis erwartet wird.',
+        'Formuliere den Aufgabentitel konkreter, damit das erwartete Ergebnis klar erkennbar ist.',
       ))
     }
 
@@ -81,7 +81,7 @@ export function evaluateTaskQuality(task) {
       score -= 25
       issues.push(createIssue(
         'Titel wirkt zu allgemein',
-        'Vermeide Platzhalter wie „Test“, „Aufgabe“ oder „Machen“. Besser ist ein konkretes Ergebnis.',
+        'Vermeide Platzhalter wie „Test", „Aufgabe" oder „Machen". Besser ist ein konkretes Ergebnis.',
         'critical',
       ))
     }
@@ -90,8 +90,8 @@ export function evaluateTaskQuality(task) {
   if (isUnassignedTask(task)) {
     score -= 25
     issues.push(createIssue(
-      'Verantwortlicher fehlt',
-      'Eine Aufgabe sollte immer einer Person zugeordnet sein, damit klar ist, wer sie erledigt.',
+      'Zuständige Person fehlt',
+      'Eine Aufgabe sollte immer einer Person zugeordnet sein, damit klar ist, wer sie bearbeitet.',
       'critical',
     ))
   }
@@ -99,8 +99,8 @@ export function evaluateTaskQuality(task) {
   if (!task.deadline) {
     score -= 20
     issues.push(createIssue(
-      'Deadline fehlt',
-      'Ohne Deadline ist unklar, wann diese Aufgabe erledigt sein soll.',
+      'Frist fehlt',
+      'Ohne Frist ist unklar, wann diese Aufgabe erledigt sein soll.',
     ))
   }
 
@@ -115,8 +115,8 @@ export function evaluateTaskQuality(task) {
   if (!task.meetingTitle) {
     score -= 5
     issues.push(createIssue(
-      'Meeting-Kontext fehlt',
-      'Mit Meeting-Bezug ist später besser nachvollziehbar, woher die Aufgabe stammt.',
+      'Besprechungsbezug fehlt',
+      'Mit Besprechungsbezug ist später besser nachvollziehbar, woher die Aufgabe stammt.',
     ))
   }
 
@@ -126,7 +126,7 @@ export function evaluateTaskQuality(task) {
     score -= 10
     issues.push(createIssue(
       'Aufgabe ist überfällig',
-      'Die Deadline wurde überschritten. Die Aufgabe sollte geprüft oder neu geplant werden.',
+      'Die Frist wurde überschritten. Die Aufgabe sollte geprüft oder neu geplant werden.',
       'critical',
     ))
   }
@@ -137,7 +137,7 @@ export function evaluateTaskQuality(task) {
     return {
       score: finalScore,
       level: 'good',
-      label: 'Sehr gut',
+      label: 'Sehr klar',
       summary: 'Diese Aufgabe ist klar, zugeordnet und gut planbar.',
       issues,
     }
@@ -148,7 +148,7 @@ export function evaluateTaskQuality(task) {
       score: finalScore,
       level: 'warning',
       label: 'Verbesserbar',
-      summary: 'Diese Aufgabe ist nutzbar, braucht aber noch bessere Struktur.',
+      summary: 'Diese Aufgabe ist nutzbar, für eine zuverlässige Bearbeitung fehlen aber noch einige Angaben.',
       issues,
     }
   }
@@ -156,8 +156,8 @@ export function evaluateTaskQuality(task) {
   return {
     score: finalScore,
     level: 'critical',
-    label: 'Kritisch',
-    summary: 'Diese Aufgabe ist noch nicht sauber genug, um zuverlässig umgesetzt zu werden.',
+    label: 'Verbesserung nötig',
+    summary: 'Für eine zuverlässige Bearbeitung fehlen noch einige wichtige Angaben.',
     issues,
   }
 }
@@ -168,7 +168,7 @@ export function taskQualityBadgeClass(task) {
   const classes = {
     good: 'border-emerald-200 bg-emerald-50 text-emerald-700',
     warning: 'border-amber-200 bg-amber-50 text-amber-700',
-    critical: 'border-red-200 bg-red-50 text-red-700',
+    critical: 'border-brand/20 bg-brand/10 text-brand',
     done: 'border-emerald-200 bg-emerald-50 text-emerald-700',
   }
 

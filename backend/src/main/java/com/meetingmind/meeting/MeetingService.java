@@ -354,6 +354,20 @@ public class MeetingService {
         return new FollowUpDto(subject, body.toString());
     }
 
+    public void deleteMeeting(Long meetingId, Long userId) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+
+        List<Task> tasks = taskRepository.findByMeetingOrderByCreatedAtAsc(meeting);
+        if (tasks != null && !tasks.isEmpty()) {
+            taskRepository.deleteAll(tasks);
+        }
+
+        transcriptRepository.findByMeeting(meeting)
+            .ifPresent(transcriptRepository::delete);
+
+        meetingRepository.delete(meeting);
+    }
+
     private Meeting getOwnedMeeting(Long meetingId, Long userId) {
         return meetingRepository.findByIdAndCreatedBy_Id(meetingId, userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));

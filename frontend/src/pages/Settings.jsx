@@ -5,8 +5,7 @@ import DataCard from '../components/ui/DataCard.jsx'
 import Tabs from '../components/ui/Tabs.jsx'
 import Button from '../components/ui/Button.jsx'
 import ErrorAlert from '../components/ui/ErrorAlert.jsx'
-import { UserIcon, GlobeIcon, BellIcon, PlugIcon, UsersIcon } from '../components/icons.jsx'
-import { getApiErrorMessage } from '../lib/apiErrors.js'
+import { UserIcon, GlobeIcon, BellIcon, PlugIcon, UsersIcon, ShieldIcon } from '../components/icons.jsx'
 
 function Toggle({ checked, onChange }) {
   return (
@@ -38,10 +37,10 @@ function Row({ title, description, children }) {
   )
 }
 
-function RoadmapBadge() {
+function PlannedBadge() {
   return (
-    <span className="inline-flex items-center rounded-full border border-line bg-soft px-2.5 py-1 text-[11px] font-medium text-muted">
-      Roadmap
+    <span className="inline-flex items-center rounded-full border border-brand/20 bg-brand/[0.06] px-2.5 py-1 text-[11px] font-medium text-brand">
+      Geplant
     </span>
   )
 }
@@ -69,14 +68,14 @@ function roleDescription(role) {
   const value = String(role || '').toUpperCase()
 
   if (value === 'ADMIN') {
-    return 'Kann Workspace-Einstellungen verwalten und Teammitglieder einladen.'
+    return 'Kann Organisationseinstellungen verwalten und Teammitglieder einladen.'
   }
 
   if (value === 'MANAGER') {
-    return 'Kann Meetings, Aufgaben und Projektakten im Team koordinieren.'
+    return 'Kann Besprechungen, Aufgaben und Mandate im Team koordinieren.'
   }
 
-  return 'Kann Meetings, Aufgaben und eigene Arbeitsbereiche nutzen.'
+  return 'Kann Besprechungen, Aufgaben und eigene Arbeitsbereiche nutzen.'
 }
 
 function initialsOf(member) {
@@ -84,14 +83,18 @@ function initialsOf(member) {
   return initials || String(member?.email || 'MM').slice(0, 2).toUpperCase()
 }
 
-const ROADMAP_INTEGRATIONS = [
+const PLANNED_INTEGRATIONS = [
   {
     name: 'Kalender-Integration',
-    desc: 'Geplant: Meetings später mit externen Kalendern synchronisieren.',
+    desc: 'Geplant: Besprechungen später mit externen Kalendern synchronisieren.',
   },
   {
-    name: 'Video-Meeting-Import',
-    desc: 'Geplant: Aufzeichnungen und Transkripte aus Meeting-Tools importieren.',
+    name: 'E-Mail-Versand',
+    desc: 'Geplant: Einladungen und Nachbereitungen direkt per E-Mail versenden.',
+  },
+  {
+    name: 'Dokumentenexport',
+    desc: 'Geplant: Aktennotizen und Aufgaben als PDF oder Word exportieren.',
   },
 ]
 
@@ -99,6 +102,7 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
   const [language, setLanguage] = useState('de')
   const [emailNotif, setEmailNotif] = useState(true)
   const [taskNotif, setTaskNotif] = useState(true)
+  const [meetingNotif, setMeetingNotif] = useState(true)
   const [team, setTeam] = useState(null)
   const [loadingTeam, setLoadingTeam] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -108,8 +112,8 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
   const [teamSuccess, setTeamSuccess] = useState('')
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'MM'
-  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'MeetingMind User'
-  const workspaceName = team?.workspaceName || user?.workspaceName || 'Mein Workspace'
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'MeetingMind Nutzer'
+  const workspaceName = team?.workspaceName || user?.workspaceName || 'Mein Arbeitsbereich'
   const userRole = roleLabel(user?.role)
 
   async function loadTeam() {
@@ -120,9 +124,9 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
     try {
       const res = await api.get('/team')
       setTeam(res.data)
-    } catch (err) {
+    } catch {
       setTeamSuccess('')
-      setTeamError(getApiErrorMessage(err, 'Teamdaten konnten nicht geladen werden.'))
+      setTeamError('Teamdaten konnten nicht geladen werden. Bitte versuche es später erneut.')
     } finally {
       setLoadingTeam(false)
     }
@@ -163,9 +167,9 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
       setInviteRole('MEMBER')
       setTeamError('')
       setTeamSuccess(`Einladung für ${cleanEmail} wurde erstellt.`)
-    } catch (err) {
+    } catch {
       setTeamSuccess('')
-      setTeamError(getApiErrorMessage(err, 'Einladung konnte nicht erstellt werden.'))
+      setTeamError('Einladung konnte nicht erstellt werden. Bitte versuche es später erneut.')
     } finally {
       setInviting(false)
     }
@@ -175,29 +179,49 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
     <div className="space-y-6">
       <PageHeader
         title="Einstellungen"
-        subtitle="Verwalte Profil, Workspace, Rollen und Team-Einladungen."
+        subtitle="Passe Profil, Organisation, Teamzugriffe und Benachrichtigungen zentral an."
+        badge="Arbeitsbereich"
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <DataCard title="Profil" icon={UserIcon}>
           <div className="flex items-center gap-4">
-            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-navy text-[16px] font-semibold text-white">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-navy text-[16px] font-semibold text-white">
               {initials}
             </span>
-            <div>
-              <p className="text-[15px] font-semibold text-ink">{fullName}</p>
-              <p className="text-[13px] text-muted">{user?.email}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold text-ink">{fullName}</p>
+              <p className="truncate text-[13px] text-muted">{user?.email}</p>
             </div>
+          </div>
+
+          <div className="mt-4 divide-y divide-line rounded-card border border-line bg-canvas">
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <span className="text-[13px] text-muted">Rolle</span>
+              <span className="rounded-full border border-brand/15 bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand">
+                {userRole}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4 px-4 py-3">
+              <span className="text-[13px] text-muted">Arbeitsbereich</span>
+              <span className="truncate text-[13px] font-medium text-ink">{workspaceName}</span>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <Button size="sm" variant="secondary" disabled>
+              Profil bearbeiten
+            </Button>
           </div>
         </DataCard>
 
-        <DataCard title="Team-Workspace" icon={UsersIcon}>
+        <DataCard title="Organisation" icon={UsersIcon}>
           <div className="rounded-card border border-line bg-canvas p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-[15px] font-semibold text-ink">{workspaceName}</p>
                 <p className="mt-1 text-[13px] leading-relaxed text-muted">
-                  Gemeinsamer Arbeitsbereich für Meetings, Aufgaben, Projekte und Teammitglieder.
+                  Gemeinsamer Arbeitsbereich für Besprechungen, Aufgaben, Fristen und Aktennotizen.
                 </p>
               </div>
               <ActiveBadge />
@@ -216,7 +240,7 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
               description={
                 loadingTeam
                   ? 'Teamdaten werden geladen…'
-                  : `${team?.members?.length || 1} aktive Person(en) im Workspace.`
+                  : `${team?.members?.length || 1} aktive Person(en) im Arbeitsbereich.`
               }
             >
               <span className="rounded-full border border-line bg-soft px-2.5 py-1 text-[11px] font-semibold text-muted">
@@ -226,7 +250,11 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
           </div>
         </DataCard>
 
-        <DataCard title="Team-Mitglieder & Einladungen" icon={UsersIcon}>
+        <DataCard title="Team & Rollen" icon={UsersIcon}>
+          <p className="mb-4 text-[13px] leading-relaxed text-muted">
+            Verwalte Mitglieder, Rollen und Zugriffe innerhalb deines Arbeitsbereichs.
+          </p>
+
           <ErrorAlert message={teamError} />
 
           {teamSuccess && (
@@ -238,7 +266,7 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
           <form onSubmit={handleInvite} className="mt-2 rounded-card border border-line bg-canvas p-4">
             <p className="text-[14px] font-semibold text-ink">Neue Einladung</p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-              Erstelle eine offene Einladung für den aktuellen Workspace. Der E-Mail-Versand wird später angebunden.
+              Erstelle eine offene Einladung für den aktuellen Arbeitsbereich. Der E-Mail-Versand wird später angebunden.
             </p>
 
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_150px]">
@@ -327,47 +355,73 @@ export default function Settings({ user, theme = 'light', onThemeChange }) {
           </div>
         </DataCard>
 
-        <DataCard title="Sprache & Darstellung" icon={GlobeIcon}>
+        <div className="space-y-6">
+          <DataCard title="Sprache & Darstellung" icon={GlobeIcon}>
+            <div className="divide-y divide-line">
+              <Row title="Sprache" description="Sprache der Oberfläche.">
+                <Tabs
+                  tabs={[{ key: 'de', label: 'Deutsch' }, { key: 'en', label: 'English' }]}
+                  value={language}
+                  onChange={setLanguage}
+                />
+              </Row>
+              <Row title="Darstellung" description="Helles oder dunkles Erscheinungsbild.">
+                <Tabs
+                  tabs={[{ key: 'light', label: 'Hell' }, { key: 'dark', label: 'Dunkel' }]}
+                  value={theme}
+                  onChange={(v) => onThemeChange?.(v)}
+                />
+              </Row>
+            </div>
+          </DataCard>
+
+          <DataCard title="Benachrichtigungen" icon={BellIcon}>
+            <div className="divide-y divide-line">
+              <Row title="Fristenerinnerungen" description="Erhalte Hinweise zu anstehenden Fristen und offenen Aufgaben.">
+                <Toggle checked={taskNotif} onChange={setTaskNotif} />
+              </Row>
+              <Row title="Besprechungszusammenfassungen" description="Erhalte Zusammenfassungen nach analysierten Besprechungen.">
+                <Toggle checked={meetingNotif} onChange={setMeetingNotif} />
+              </Row>
+              <Row title="E-Mail-Benachrichtigungen" description="Zusätzlich per E-Mail informiert werden.">
+                <Toggle checked={emailNotif} onChange={setEmailNotif} />
+              </Row>
+            </div>
+          </DataCard>
+        </div>
+
+        <DataCard title="Datenschutz & Sicherheit" icon={ShieldIcon}>
+          <p className="mb-4 text-[13px] leading-relaxed text-muted">
+            Verwalte sicherheitsrelevante Einstellungen für deinen Arbeitsbereich.
+          </p>
+
           <div className="divide-y divide-line">
-            <Row title="Sprache" description="Sprache der Oberfläche.">
-              <Tabs
-                tabs={[{ key: 'de', label: 'Deutsch' }, { key: 'en', label: 'English' }]}
-                value={language}
-                onChange={setLanguage}
-              />
+            <Row title="Zugriff & Rollen" description="Steuere, wer Besprechungen und Mandate einsehen darf.">
+              <PlannedBadge />
             </Row>
-            <Row title="Designmodus" description="Wähle zwischen hellem und dunklem Erscheinungsbild.">
-              <Tabs
-                tabs={[{ key: 'light', label: 'Hell' }, { key: 'dark', label: 'Dunkel' }]}
-                value={theme}
-                onChange={(v) => onThemeChange?.(v)}
-              />
+            <Row title="Vertrauliche Besprechungsdaten" description="Kennzeichne Besprechungen mit besonders sensiblen Inhalten.">
+              <PlannedBadge />
+            </Row>
+            <Row title="Datenexport" description="Exportiere deine Daten als strukturierte Datei.">
+              <PlannedBadge />
+            </Row>
+            <Row title="Löschoptionen" description="Lösche einzelne Besprechungen oder Aufgaben dauerhaft.">
+              <PlannedBadge />
             </Row>
           </div>
         </DataCard>
 
-        <DataCard title="Benachrichtigungen" icon={BellIcon}>
-          <div className="divide-y divide-line">
-            <Row title="E-Mail-Benachrichtigungen" description="Lokale Einstellung für spätere Meeting-Zusammenfassungen.">
-              <Toggle checked={emailNotif} onChange={setEmailNotif} />
-            </Row>
-            <Row title="Aufgaben-Erinnerungen" description="Lokale Einstellung für spätere Hinweise zu fälligen Aufgaben.">
-              <Toggle checked={taskNotif} onChange={setTaskNotif} />
-            </Row>
-          </div>
-        </DataCard>
-
-        <DataCard title="Roadmap" icon={PlugIcon}>
+        <DataCard title="Integrationen" icon={PlugIcon}>
           <div className="mb-3 rounded-xl border border-line bg-canvas px-4 py-3">
             <p className="text-[13px] leading-relaxed text-muted">
-              Diese Punkte sind als nächste Ausbaustufen geplant und aktuell noch nicht aktiv verbunden.
+              Geplante Anbindungen für Kalender, E-Mail, Dokumentenexport und externe Systeme.
             </p>
           </div>
 
           <div className="divide-y divide-line">
-            {ROADMAP_INTEGRATIONS.map((it) => (
+            {PLANNED_INTEGRATIONS.map((it) => (
               <Row key={it.name} title={it.name} description={it.desc}>
-                <RoadmapBadge />
+                <PlannedBadge />
               </Row>
             ))}
           </div>
