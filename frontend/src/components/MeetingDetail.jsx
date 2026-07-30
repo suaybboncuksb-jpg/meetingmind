@@ -3,7 +3,7 @@ import api from '../api/client.js'
 import Button from './ui/Button.jsx'
 import ErrorAlert from './ui/ErrorAlert.jsx'
 import StatusBadge from './ui/StatusBadge.jsx'
-import { XIcon, SparklesIcon } from './icons.jsx'
+import { ArrowLeftIcon, SparklesIcon } from './icons.jsx'
 import { formatDate, meetingDateOf } from '../lib/meetings.js'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
 import {
@@ -16,8 +16,8 @@ import {
 const TABS = [
   { key: 'overview', label: 'Übersicht' },
   { key: 'analysis', label: 'KI-Analyse' },
-  { key: 'transcript', label: 'Transkript' },
-  { key: 'followup', label: 'Follow-up' },
+  { key: 'transcript', label: 'Protokoll' },
+  { key: 'followup', label: 'Nachbereitung' },
 ]
 
 function priorityLabel(priority) {
@@ -139,7 +139,7 @@ function PreviewList({ title, items = [], empty = 'Keine Einträge erkannt.' }) 
 
 export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreated }) {
   const [activeTab, setActiveTab] = useState('overview')
-  const [transcript, setTranscript] = useState(meeting.transcript || '')
+  const [transcript, setTranscript] = useState(meeting?.transcript || '')
   const [analyzing, setAnalyzing] = useState(false)
   const [followUp, setFollowUp] = useState(null)
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
@@ -158,7 +158,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
   const transcriptStats = useMemo(() => getTranscriptStats(transcript), [transcript])
   const transcriptQuality = useMemo(() => getTranscriptQuality(transcript), [transcript])
 
-  const failedAnalysis = String(analysisDetails?.summary || meeting.aiSummary || '')
+  const failedAnalysis = String(analysisDetails?.summary || meeting?.aiSummary || '')
     .toLowerCase()
     .includes('analyse fehlgeschlagen')
 
@@ -166,9 +166,11 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
     ? 'Lädt…'
     : failedAnalysis
       ? 'Fehlgeschlagen'
-      : (analysisDetails?.analysisStatus || meeting.status || 'Offen')
+      : (analysisDetails?.analysisStatus || meeting?.status || 'Offen')
 
   useEffect(() => {
+    if (!meeting?.id) return
+
     let cancelled = false
 
     async function loadAnalysisDetails() {
@@ -196,11 +198,22 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
     return () => {
       cancelled = true
     }
-  }, [meeting.id, meeting.status, meeting.aiSummary])
+  }, [meeting?.id, meeting?.status, meeting?.aiSummary])
+
+  if (!meeting) {
+    return (
+      <div className="rounded-[28px] border border-line bg-surface p-8 text-center shadow-soft">
+        <p className="text-[14px] text-muted">Diese Besprechung wurde nicht gefunden.</p>
+        <div className="mt-4 flex justify-center">
+          <Button variant="secondary" onClick={onClose}>Zurück zu Besprechungen</Button>
+        </div>
+      </div>
+    )
+  }
 
   function handleCleanTranscript(reduceFillers = false) {
     if (!transcript.trim()) {
-      setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
+      setError('Bitte füge zuerst ein Protokoll ein.')
       return
     }
 
@@ -211,7 +224,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
 
   async function handleCreateAnalysisPreview() {
     if (!transcript.trim()) {
-      setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
+      setError('Bitte füge zuerst ein Protokoll ein.')
       return
     }
 
@@ -231,7 +244,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
       setActiveTab('analysis')
     } catch (err) {
       onUpdated?.({ ...meeting, status: 'ANALYSIS_FAILED' })
-      setError(getApiErrorMessage(err, 'Analyse-Vorschau fehlgeschlagen. Bitte prüfe API-Key, Transkript und KI-Verbindung.'))
+      setError(getApiErrorMessage(err, 'Analyse-Vorschau fehlgeschlagen. Bitte prüfe API-Key, Protokoll und KI-Verbindung.'))
     } finally {
       setLoadingPreview(false)
     }
@@ -256,7 +269,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
 
   async function handleAnalyze() {
     if (!transcript.trim()) {
-      setError('Bitte füge zuerst ein Protokoll/Transkript ein.')
+      setError('Bitte füge zuerst ein Protokoll ein.')
       return
     }
 
@@ -272,7 +285,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
       setActiveTab('analysis')
     } catch (err) {
       onUpdated?.({ ...meeting, status: 'ANALYSIS_FAILED' })
-      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen. Bitte prüfe API-Key, Transkript und KI-Verbindung.'))
+      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen. Bitte prüfe API-Key, Protokoll und KI-Verbindung.'))
     } finally {
       setAnalyzing(false)
     }
@@ -321,7 +334,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
       const res = await api.get(`/meetings/${meeting.id}/follow-up`)
       setFollowUp(res.data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Follow-up konnte nicht erstellt werden.'))
+      setError(getApiErrorMessage(err, 'Nachbereitung konnte nicht erstellt werden.'))
     } finally {
       setLoadingFollowUp(false)
     }
@@ -335,7 +348,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
       const res = await api.get(`/meetings/${meeting.id}/quality-score`)
       setQualityScore(res.data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Meeting-Score konnte nicht geladen werden.'))
+      setError(getApiErrorMessage(err, 'Besprechungs-Score konnte nicht geladen werden.'))
     } finally {
       setLoadingQualityScore(false)
     }
@@ -351,54 +364,45 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1800)
     } catch {
-      setError('Follow-up konnte nicht in die Zwischenablage kopiert werden.')
+      setError('Nachbereitung konnte nicht in die Zwischenablage kopiert werden.')
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-navy/40 px-4 py-6 backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="flex h-[78vh] min-h-[620px] w-full max-w-6xl flex-col overflow-hidden rounded-[34px] border border-line bg-surface shadow-card"
-        onClick={(e) => e.stopPropagation()}
+    <div className="space-y-5">
+      <button
+        type="button"
+        onClick={onClose}
+        className="inline-flex items-center gap-2 text-[13px] font-semibold text-muted transition hover:text-ink"
       >
-        <header className="border-b border-line bg-surface/95 px-6 py-5 backdrop-blur-xl">
-          <div className="flex items-start justify-between gap-5">
-            <div className="min-w-0">
-              <p className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-muted">
-                Meeting Command Center
-              </p>
+        <ArrowLeftIcon size={16} />
+        Zurück zu Besprechungen
+      </button>
 
-              <div className="mt-2 flex flex-wrap items-center gap-3">
-                <h2 className="truncate text-[26px] font-semibold tracking-[-0.04em] text-ink">
-                  {meeting.title || 'Ohne Titel'}
-                </h2>
-                <StatusBadge status={meeting.status} />
-              </div>
+      <div className="rounded-[34px] border border-line/80 bg-surface/86 shadow-card backdrop-blur-xl">
+        <header className="border-b border-line px-6 py-5">
+          <p className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-muted">
+            Besprechungsakte
+          </p>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted">
-                <span>{formatDate(meetingDateOf(meeting))}</span>
-                {meeting.projectName ? (
-                  <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[12px] font-semibold text-brand">
-                    Projekt / Kunde: {meeting.projectName}
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-soft px-2.5 py-1 text-[12px] font-semibold text-muted">
-                    Kein Projekt hinterlegt
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h2 className="truncate text-[26px] font-semibold tracking-[-0.04em] text-ink">
+              {meeting.title || 'Ohne Titel'}
+            </h2>
+            <StatusBadge status={meeting.status} />
+          </div>
 
-            <button
-              onClick={onClose}
-              className="rounded-2xl p-2 text-muted transition hover:bg-soft hover:text-ink"
-              aria-label="Schließen"
-            >
-              <XIcon size={20} />
-            </button>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+            <span>{formatDate(meetingDateOf(meeting))}</span>
+            {meeting.projectName ? (
+              <span className="rounded-full bg-brand/10 px-2.5 py-1 text-[12px] font-semibold text-brand">
+                Mandant / Aktenzeichen: {meeting.projectName}
+              </span>
+            ) : (
+              <span className="rounded-full bg-soft px-2.5 py-1 text-[12px] font-semibold text-muted">
+                Kein Mandant hinterlegt
+              </span>
+            )}
           </div>
 
           <div className="mt-5 flex flex-wrap items-center gap-2 rounded-[22px] border border-line bg-canvas/70 p-1.5">
@@ -414,42 +418,29 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto bg-canvas/45 px-6 py-6">
+        <main className="bg-canvas/45 px-6 py-6">
           <div className="mx-auto max-w-5xl space-y-5">
             <ErrorAlert message={error} />
 
             {activeTab === 'overview' && (
               <div className="space-y-5">
                 <section className="rounded-[28px] border border-line bg-surface p-6 shadow-soft">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
-                      <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                        Überblick
-                      </p>
-                      <h3 className="mt-2 text-[22px] font-semibold tracking-tight text-ink">
-                        Aus diesem Meeting entsteht deine Nachbereitung.
-                      </h3>
-                      <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
-                        Bereinige das Transkript, erstelle eine KI-Vorschau und überführe Ergebnisse in Aufgaben, Entscheidungen und Follow-up.
-                      </p>
-                    </div>
-
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <Button variant="secondary" onClick={() => setActiveTab('transcript')}>
-                        Transkript öffnen
-                      </Button>
-                      <Button icon={SparklesIcon} onClick={() => setActiveTab('analysis')}>
-                        Analyse ansehen
-                      </Button>
-                    </div>
-                  </div>
+                  <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
+                    Überblick
+                  </p>
+                  <h3 className="mt-2 text-[22px] font-semibold tracking-tight text-ink">
+                    Aus dieser Besprechung entsteht deine Aktennotiz, Aufgabenübersicht und Fristenkontrolle.
+                  </h3>
+                  <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
+                    Bereinige das Protokoll, erstelle eine KI-Vorschau und überführe Ergebnisse in Aufgaben, Entscheidungen und Nachbereitung.
+                  </p>
                 </section>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
-                  <InfoTile label="Analyse" value={analysisStatus} description="Status der KI-Nachbereitung." />
-                  <InfoTile label="Transkript" value={`${transcriptStats.words} Wörter`} description={`${transcriptStats.lines} Zeilen, ${transcriptStats.speakerCount} Sprecher.`} />
+                  <InfoTile label="Analyse" value={analysisStatus === 'PENDING' ? 'Ausstehend' : analysisStatus} description="Status der KI-Nachbereitung." />
+                  <InfoTile label="Protokoll" value={`${transcriptStats.words} Wörter`} description={`${transcriptStats.lines} Zeilen, ${transcriptStats.speakerCount} Sprecher.`} />
                   <InfoTile label="Qualität" value={`${transcriptQuality.score} %`} description={transcriptQuality.label} />
-                  <InfoTile label="Projekt" value={meeting.projectName || '—'} description="Für Projektakte und Verlauf." />
+                  <InfoTile label="Mandant" value={meeting.projectName || '—'} description="Für Mandatsakte und Verlauf." />
                 </div>
 
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -458,16 +449,16 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                       Nächster sinnvoller Schritt
                     </p>
                     <h3 className="mt-2 text-[18px] font-semibold text-ink">
-                      {transcript.trim() ? 'KI-Vorschau erstellen' : 'Transkript einfügen'}
+                      {transcript.trim() ? 'KI-Vorschau erstellen' : 'Protokoll einfügen'}
                     </h3>
                     <p className="mt-2 text-[13px] leading-relaxed text-muted">
                       {transcript.trim()
-                        ? 'Das Transkript ist vorhanden. Erstelle zuerst eine Vorschau, bevor du Analyse und Aufgaben speicherst.'
-                        : 'Füge ein Meeting-Protokoll ein, damit MeetingMind Aufgaben, Entscheidungen und offene Fragen erkennen kann.'}
+                        ? 'Das Protokoll ist vorhanden. Erstelle zuerst eine Vorschau, bevor du Analyse und Aufgaben speicherst.'
+                        : 'Füge ein Besprechungsprotokoll ein, damit MeetingMind Aufgaben, Entscheidungen und offene Fragen erkennen kann.'}
                     </p>
                     <div className="mt-4">
                       <Button onClick={() => setActiveTab('transcript')}>
-                        Zum Transkript
+                        Zum Protokoll
                       </Button>
                     </div>
                   </section>
@@ -477,10 +468,10 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                       KI-Ergebnisse
                     </p>
                     <h3 className="mt-2 text-[18px] font-semibold text-ink">
-                      {analysisDetails?.summary || meeting.aiSummary ? 'Analyse vorhanden' : 'Noch keine stabile Analyse'}
+                      {analysisDetails?.summary || meeting.aiSummary ? 'Analyse vorhanden' : 'Noch keine Analyse vorhanden'}
                     </h3>
                     <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                      Entscheidungen, offene Fragen und nächste Schritte erscheinen im Tab „KI-Analyse“.
+                      Entscheidungen, offene Fragen und nächste Schritte erscheinen im Tab „KI-Analyse".
                     </p>
                     <div className="mt-4">
                       <Button variant="secondary" onClick={() => setActiveTab('analysis')}>
@@ -489,32 +480,6 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                     </div>
                   </section>
                 </div>
-
-                <section className="rounded-[28px] border border-line bg-surface p-5 shadow-soft">
-                  <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                    MeetingMind Workflow
-                  </p>
-                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                    <div className="rounded-2xl border border-line bg-canvas/70 px-4 py-4">
-                      <p className="text-[13px] font-semibold text-ink">1. Transkript vorbereiten</p>
-                      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Protokoll bereinigen und Sprecher, Aufgaben und Deadlines klar erfassen.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-line bg-canvas/70 px-4 py-4">
-                      <p className="text-[13px] font-semibold text-ink">2. KI-Vorschau prüfen</p>
-                      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Zusammenfassung, Aufgaben, Entscheidungen und offene Fragen kontrollieren.
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-line bg-canvas/70 px-4 py-4">
-                      <p className="text-[13px] font-semibold text-ink">3. Umsetzung starten</p>
-                      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Aufgaben zuweisen, Follow-up erstellen und Projektakte aktuell halten.
-                      </p>
-                    </div>
-                  </div>
-                </section>
               </div>
             )}
 
@@ -566,7 +531,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                         Zusammenfassung, Entscheidungen und Aufgaben
                       </h3>
                       <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                        Status: {analysisStatus}
+                        Status: {analysisStatus === 'PENDING' ? 'Ausstehend' : analysisStatus}
                       </p>
                     </div>
 
@@ -587,57 +552,66 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                   </div>
                 </section>
 
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  <AnalysisResultList
-                    title="Entscheidungen"
-                    items={analysisDetails?.decisions || []}
-                    empty="Noch keine Entscheidungen dokumentiert."
-                    tone="decision"
-                  />
-
-                  <AnalysisResultList
-                    title="Offene Fragen"
-                    items={analysisDetails?.questions || []}
-                    empty="Keine offenen Fragen erkannt."
-                    tone="question"
-                    onCreateTask={(question) => {
-                      const isCreating = creatingQuestionTask === question
-                      const wasCreated = questionTaskSuccess === question
-
-                      return (
-                        <Button
-                          size="sm"
-                          variant={wasCreated ? 'secondary' : 'primary'}
-                          onClick={() => handleCreateTaskFromQuestion(question)}
-                          disabled={isCreating || wasCreated}
-                        >
-                          {isCreating ? 'Wird erstellt…' : wasCreated ? 'Aufgabe erstellt ✅' : 'Als Aufgabe anlegen'}
-                        </Button>
-                      )
-                    }}
-                  />
-
-                  <AnalysisResultList
-                    title="Nächste Schritte"
-                    items={analysisDetails?.nextSteps || []}
-                    empty="Noch keine nächsten Schritte erkannt."
-                    tone="step"
-                  />
-
-                  <AnalysisResultList
-                    title="Wichtige Punkte"
-                    items={analysisDetails?.keyPoints || []}
-                    empty="Noch keine wichtigen Punkte erkannt."
-                  />
-
-                  <div className="lg:col-span-2">
+                {(analysisDetails?.summary || meeting.aiSummary) ? (
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                     <AnalysisResultList
-                      title="Erkannte Aufgaben aus Analyse"
-                      items={analysisDetails?.actionItems || []}
-                      empty="Noch keine Aufgaben aus der Analyse gespeichert."
+                      title="Entscheidungen"
+                      items={analysisDetails?.decisions || []}
+                      empty="Noch keine Entscheidungen dokumentiert."
+                      tone="decision"
                     />
+
+                    <AnalysisResultList
+                      title="Offene Fragen"
+                      items={analysisDetails?.questions || []}
+                      empty="Keine offenen Fragen erkannt."
+                      tone="question"
+                      onCreateTask={(question) => {
+                        const isCreating = creatingQuestionTask === question
+                        const wasCreated = questionTaskSuccess === question
+
+                        return (
+                          <Button
+                            size="sm"
+                            variant={wasCreated ? 'secondary' : 'primary'}
+                            onClick={() => handleCreateTaskFromQuestion(question)}
+                            disabled={isCreating || wasCreated}
+                          >
+                            {isCreating ? 'Wird erstellt…' : wasCreated ? 'Aufgabe erstellt ✅' : 'Als Aufgabe anlegen'}
+                          </Button>
+                        )
+                      }}
+                    />
+
+                    <AnalysisResultList
+                      title="Nächste Schritte"
+                      items={analysisDetails?.nextSteps || []}
+                      empty="Noch keine nächsten Schritte erkannt."
+                      tone="step"
+                    />
+
+                    <AnalysisResultList
+                      title="Wichtige Punkte"
+                      items={analysisDetails?.keyPoints || []}
+                      empty="Noch keine wichtigen Punkte erkannt."
+                    />
+
+                    <div className="lg:col-span-2">
+                      <AnalysisResultList
+                        title="Erkannte Aufgaben aus Analyse"
+                        items={analysisDetails?.actionItems || []}
+                        empty="Noch keine Aufgaben aus der Analyse gespeichert."
+                      />
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="rounded-[24px] border border-line bg-canvas/70 px-5 py-6 text-center">
+                    <p className="text-[13px] font-semibold text-ink">Noch keine Analyse vorhanden</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                      Sobald ein Protokoll analysiert wurde, erscheinen hier Entscheidungen, offene Fragen, nächste Schritte und erkannte Aufgaben.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -647,13 +621,13 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                        Transkript-Studio
+                        Protokollbereich
                       </p>
                       <h3 className="mt-2 text-[22px] font-semibold tracking-tight text-ink">
-                        Bereite dein Meeting-Protokoll für die KI-Analyse vor.
+                        Bereite dein Besprechungsprotokoll für die KI-Analyse vor.
                       </h3>
                       <p className="mt-2 max-w-2xl text-[14px] leading-relaxed text-muted">
-                        Je klarer Sprecher, Aufgaben und Deadlines benannt sind, desto besser werden Zusammenfassung und Action Items.
+                        Je klarer Sprecher, Aufgaben und Fristen benannt sind, desto besser werden Zusammenfassung und Aufgaben.
                       </p>
                     </div>
 
@@ -669,28 +643,30 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                     <TranscriptStat label="Min. Lesezeit" value={transcriptStats.estimatedMinutes} />
                   </div>
 
-                  <div className="mt-5 rounded-2xl border border-line bg-canvas/70 px-4 py-3">
-                    <p className="text-[13px] font-semibold text-ink">{transcriptQuality.summary}</p>
+                  {transcript.trim() ? (
+                    <div className="mt-5 rounded-2xl border border-line bg-canvas/70 px-4 py-3">
+                      <p className="text-[13px] font-semibold text-ink">{transcriptQuality.summary}</p>
 
-                    {transcriptQuality.issues.length > 0 ? (
-                      <ul className="mt-2 space-y-1.5">
-                        {transcriptQuality.issues.slice(0, 3).map((issue) => (
-                          <li key={issue} className="text-[12.5px] leading-relaxed text-muted">
-                            • {issue}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Das Transkript ist bereit für eine bessere Analyse von Aufgaben, Entscheidungen und offenen Fragen.
-                      </p>
-                    )}
-                  </div>
+                      {transcriptQuality.issues.length > 0 ? (
+                        <ul className="mt-2 space-y-1.5">
+                          {transcriptQuality.issues.slice(0, 3).map((issue) => (
+                            <li key={issue} className="text-[12.5px] leading-relaxed text-muted">
+                              • {issue}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
+                          Das Protokoll ist bereit für eine bessere Analyse von Aufgaben, Entscheidungen und offenen Fragen.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
 
                   <textarea
                     value={transcript}
                     onChange={(e) => setTranscript(e.target.value)}
-                    placeholder={`Füge hier dein Meeting-Protokoll oder Transkript ein…
+                    placeholder={`Füge hier dein Besprechungsprotokoll ein…
 
 Beispiel:
 Suayb: Wir müssen das Angebot bis Freitag vorbereiten.
@@ -707,7 +683,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                         onClick={() => handleCleanTranscript(false)}
                         disabled={!transcript.trim() || analyzing}
                       >
-                        Transkript bereinigen
+                        Protokoll bereinigen
                       </Button>
 
                       <Button
@@ -726,7 +702,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                         onClick={handleCreateAnalysisPreview}
                         disabled={loadingPreview || analyzing}
                       >
-                        {loadingPreview ? 'Erstellt Vorschau…' : 'Vorschau erstellen'}
+                        {loadingPreview ? 'Erstellt Vorschau…' : 'KI-Vorschau erstellen'}
                       </Button>
 
                       <Button
@@ -734,7 +710,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                         onClick={handleAnalyze}
                         disabled={analyzing || loadingPreview}
                       >
-                        {analyzing ? 'Analysiere…' : 'Direkt analysieren'}
+                        {analyzing ? 'Analysiere…' : 'Protokoll analysieren'}
                       </Button>
                     </div>
                   </div>
@@ -743,8 +719,8 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                 <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4">
                   <p className="text-[13px] font-semibold text-brand">Tipp für bessere Aufgabenanalyse</p>
                   <p className="mt-1 text-[12.5px] leading-relaxed text-brand/80">
-                    Die besten Ergebnisse entstehen, wenn Sprecher, Verantwortliche und Deadlines klar genannt werden:
-                    „Name: Ich übernehme Aufgabe X bis Datum Y.“
+                    Die besten Ergebnisse entstehen, wenn Sprecher, Verantwortliche und Fristen klar genannt werden:
+                    „Name: Ich übernehme Aufgabe X bis Datum Y."
                   </p>
                 </div>
               </div>
@@ -756,13 +732,13 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                        Meeting-Qualitäts-Score
+                        Besprechungs-Qualitäts-Score
                       </p>
                       <h3 className="mt-2 text-[18px] font-semibold text-ink">
-                        Wie gut ist dieses Meeting nachbereitbar?
+                        Wie gut ist diese Besprechung nachbereitbar?
                       </h3>
                       <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                        Prüft, ob das Meeting klar dokumentiert und gut nachbereitbar ist.
+                        Prüft, ob die Besprechung klar dokumentiert und gut nachbereitbar ist.
                       </p>
                     </div>
 
@@ -814,7 +790,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                     <div className="mt-5 rounded-2xl border border-line bg-canvas/70 px-4 py-4">
                       <p className="text-[13px] font-semibold text-ink">Noch kein Score berechnet</p>
                       <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Berechne den Score, um zu sehen, ob dieses Meeting klar dokumentiert und gut nachbereitbar ist.
+                        Berechne den Score, um zu sehen, ob diese Besprechung klar dokumentiert und gut nachbereitbar ist.
                       </p>
                     </div>
                   )}
@@ -824,13 +800,13 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                        Follow-up-Mail
+                        Nachbereitungs-E-Mail
                       </p>
                       <h3 className="mt-2 text-[18px] font-semibold text-ink">
                         Professionelle Nachbereitung erstellen
                       </h3>
                       <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                        Erstelle einen E-Mail-Entwurf zur Nachbereitung dieses Meetings.
+                        Erstelle einen E-Mail-Entwurf zur Nachbereitung dieser Besprechung.
                       </p>
                     </div>
 
@@ -840,7 +816,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                       onClick={handleGenerateFollowUp}
                       disabled={loadingFollowUp}
                     >
-                      {loadingFollowUp ? 'Erstellt…' : 'Follow-up erstellen'}
+                      {loadingFollowUp ? 'Erstellt…' : 'Nachbereitung erstellen'}
                     </Button>
                   </div>
 
@@ -868,9 +844,9 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                     </div>
                   ) : (
                     <div className="mt-5 rounded-2xl border border-line bg-canvas/70 px-4 py-4">
-                      <p className="text-[13px] font-semibold text-ink">Noch kein Follow-up erstellt</p>
+                      <p className="text-[13px] font-semibold text-ink">Noch keine Nachbereitung erstellt</p>
                       <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                        Erstelle aus der Meeting-Zusammenfassung einen professionellen E-Mail-Entwurf für dein Team oder deinen Kunden.
+                        Erstelle aus der Besprechungs-Zusammenfassung einen professionellen E-Mail-Entwurf für dein Kanzleiteam oder deine Mandanten.
                       </p>
                     </div>
                   )}

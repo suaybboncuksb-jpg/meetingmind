@@ -94,11 +94,11 @@ function WorkBriefingCard({ briefing, onNavigate }) {
       items: briefing.weeklyItems.slice(0, 2),
     },
     {
-      title: 'Projektfokus',
+      title: 'Mandatsfokus',
       value: briefing.projectRisks.length,
       description: briefing.projectRisks.length === 0
-        ? 'Keine kritischen Projektakten erkannt.'
-        : `${briefing.projectRisks.length} Projektakte(n) sollten geprüft werden.`,
+        ? 'Keine kritischen Mandatsakten erkannt.'
+        : `${briefing.projectRisks.length} Mandatsakte(n) sollten geprüft werden.`,
       items: briefing.projectRisks.slice(0, 2).map((project) => ({
         id: project.key,
         title: project.name,
@@ -110,7 +110,7 @@ function WorkBriefingCard({ briefing, onNavigate }) {
 
   return (
     <DataCard
-      title="Executive Briefing"
+      title="Tagesüberblick"
       icon={SparklesIcon}
       noPadding
       action={
@@ -249,7 +249,7 @@ function DashboardHero({
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button icon={PlusIcon} onClick={onNewMeeting}>
-              Neues Meeting
+              Neue Besprechung
             </Button>
             <Button variant="secondary" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>
               Aufgaben prüfen
@@ -284,7 +284,7 @@ function DashboardHero({
           <div className="mt-5 grid grid-cols-3 gap-2">
             <div className="rounded-2xl border border-line bg-surface px-3 py-3">
               <p className="text-[20px] font-semibold text-ink">{meetingsCount}</p>
-              <p className="mt-0.5 text-[11.5px] text-muted">Meetings</p>
+              <p className="mt-0.5 text-[11.5px] text-muted">Besprechungen</p>
             </div>
             <div className="rounded-2xl border border-line bg-surface px-3 py-3">
               <p className="text-[20px] font-semibold text-ink">{openTasks}</p>
@@ -434,7 +434,7 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
           icon={CheckCircleIcon}
           label="Offene Aufgaben"
           value={stats.openTasks}
-          description="Noch nicht abgeschlossene Action Items."
+          description="Noch nicht abgeschlossene Aufgaben."
           tone="info"
         />
         <MetricCard
@@ -448,9 +448,9 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
-          {/* Action Hub */}
+          {/* Heute zu klären */}
           <DataCard
-            title="Arbeitsfokus"
+            title="Heute zu klären"
             icon={CheckCircleIcon}
             noPadding
             action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Aufgaben</Button>}
@@ -496,7 +496,7 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                         </div>
 
                         <p className="mt-1 text-[12.5px] text-muted">
-                          {task.meetingTitle || 'Ohne Meeting'}
+                          {task.meetingTitle || 'Ohne Besprechung'}
                           {task.assignee ? ` · Zuständig: ${task.assignee}` : ' · Kein Verantwortlicher'}
                         </p>
 
@@ -523,21 +523,21 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
             )}
           </DataCard>
 
-          {/* Letzte Meetings */}
+          {/* Letzte Besprechungen */}
           <DataCard
-            title="Letzte Meetings"
+            title="Letzte Besprechungen"
             icon={ListIcon}
             noPadding
-            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('meetings')}>Meetings</Button>}
+            action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('meetings')}>Besprechungen</Button>}
           >
             {loading ? (
               <div className="px-6 py-12 text-center text-[14px] text-muted">Wird geladen…</div>
             ) : recent.length === 0 ? (
               <EmptyState
                 icon={CalendarIcon}
-                title="Noch keine Meetings"
-                description="Erstelle dein erstes Meeting, um KI-Zusammenfassungen und Aufgaben zu erhalten."
-                action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>}
+                title="Noch keine Besprechungen erfasst"
+                description="Erstelle eine Besprechung oder analysiere ein Protokoll, damit MeetingMind Aufgaben, Zuständigkeiten, Fristen und offene Rückfragen erkennt."
+                action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Besprechung erstellen</Button>}
               />
             ) : (
               <ul className="space-y-3 px-6 py-5">
@@ -569,18 +569,19 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
         </div>
 
         <aside className="flex flex-col gap-4">
+          {/* Fristenradar (inkl. "Diese Woche relevant") */}
           <DataCard
-            title="Deadline-Radar"
+            title="Fristenradar"
             icon={ClockIcon}
             noPadding
             action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Prüfen</Button>}
           >
-            {visibleDeadlineRadarTasks.length === 0 ? (
+            {visibleDeadlineRadarTasks.length === 0 && upcomingTasks.length === 0 ? (
               <div className="px-6 py-8">
                 <div className="rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
-                  <p className="text-[13px] font-semibold text-emerald-700">Keine kritischen Deadlines</p>
+                  <p className="text-[13px] font-semibold text-emerald-700">Keine kritischen Fristen</p>
                   <p className="mt-1 text-[12.5px] leading-relaxed text-emerald-700/75">
-                    Aktuell sind keine offenen Aufgaben überfällig oder kurzfristig fällig.
+                    Aktuell sind keine offenen Aufgaben überfällig, heute fällig oder diese Woche relevant.
                   </p>
                 </div>
               </div>
@@ -601,35 +602,62 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
                   </div>
                 </div>
 
-                <ul className="divide-y divide-line">
-                  {visibleDeadlineRadarTasks.map((task) => (
-                    <li key={task.id} className="px-6 py-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-[14px] font-semibold text-ink">
-                            {task.title || 'Ohne Titel'}
-                          </p>
-                          <p className="mt-1 text-[12.5px] text-muted">
-                            Deadline: {formatDeadline(task.deadline)}
-                          </p>
+                {visibleDeadlineRadarTasks.length > 0 ? (
+                  <ul className="divide-y divide-line">
+                    {visibleDeadlineRadarTasks.map((task) => (
+                      <li key={task.id} className="px-6 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-[14px] font-semibold text-ink">
+                              {task.title || 'Ohne Titel'}
+                            </p>
+                            <p className="mt-1 text-[12.5px] text-muted">
+                              Deadline: {formatDeadline(task.deadline)}
+                            </p>
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deadlineBadgeClass(task)}`}>
+                            {deadlineLabel(task)}
+                          </span>
                         </div>
-                        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${deadlineBadgeClass(task)}`}>
-                          {deadlineLabel(task)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+
+                {upcomingTasks.length > 0 ? (
+                  <div className="border-t border-line px-6 py-4">
+                    <p className="mb-2 text-[11.5px] font-semibold uppercase tracking-[0.08em] text-muted">
+                      Diese Woche relevant
+                    </p>
+                    <ul className="space-y-2">
+                      {upcomingTasks.map((task) => (
+                        <li key={task.id} className="flex items-center justify-between gap-3">
+                          <p className="truncate text-[13px] font-medium text-ink">{task.title || 'Ohne Titel'}</p>
+                          <p className="shrink-0 text-[12px] text-muted">
+                            {formatDeadline(task.deadline)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
               </div>
             )}
           </DataCard>
 
+          {/* Offene Zuständigkeiten */}
           <DataCard
-            title="Ohne Zuständige"
+            title="Offene Zuständigkeiten"
             icon={ClockIcon}
             noPadding
             action={<Button size="sm" variant="ghost" iconRight={ArrowRightIcon} onClick={() => onNavigate('tasks')}>Prüfen</Button>}
           >
+            <div className="border-b border-line px-6 py-3">
+              <p className="text-[12.5px] leading-relaxed text-muted">
+                Aufgaben, bei denen noch keine verantwortliche Person hinterlegt ist.
+              </p>
+            </div>
+
             {visibleUnassignedTasks.length === 0 ? (
               <div className="px-6 py-8">
                 <div className="rounded-button border border-emerald-100 bg-emerald-50 px-4 py-3">
@@ -662,59 +690,6 @@ export default function Dashboard({ user, meetings = [], tasks = [], loading, on
               </ul>
             )}
           </DataCard>
-
-          <DataCard title="Diese Woche" icon={CalendarIcon} noPadding>
-            {upcomingTasks.length === 0 ? (
-              <div className="px-6 py-8">
-                <div className="rounded-button border border-line bg-canvas px-4 py-3">
-                  <p className="text-[13px] font-semibold text-ink">Keine weiteren Wochenaufgaben</p>
-                  <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                    Es gibt aktuell keine weiteren offenen Aufgaben mit Deadline in dieser Woche.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ul className="divide-y divide-line">
-                {upcomingTasks.map((task) => (
-                  <li key={task.id} className="px-6 py-4">
-                    <p className="truncate text-[14px] font-semibold text-ink">{task.title || 'Ohne Titel'}</p>
-                    <p className="mt-1 text-[12.5px] text-muted">
-                      {formatDeadline(task.deadline)}
-                      {task.projectName ? ` · ${task.projectName}` : ''}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </DataCard>
-
-          <div
-            className="relative overflow-hidden rounded-card border border-white/12 p-6 text-white shadow-card"
-            style={{ background: 'linear-gradient(160deg, #1b365d 0%, #0d2137 100%)' }}
-          >
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-brand/25 blur-2xl" />
-            <span className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 backdrop-blur-md">
-              <SparklesIcon size={20} className="text-[#7FB2E0]" />
-            </span>
-            <h3 className="relative mt-4 text-[15px] font-semibold">Schnellaktionen</h3>
-            <p className="relative mt-1.5 text-[13px] leading-relaxed text-white/70">
-              Starte ein neues Meeting oder prüfe direkt deinen aktuellen Arbeitsfokus.
-            </p>
-            <div className="relative mt-5 flex flex-col gap-2">
-              <button
-                onClick={onNewMeeting}
-                className="inline-flex items-center justify-center gap-2 rounded-button bg-white px-4 py-2.5 text-[13px] font-semibold text-navy transition hover:bg-white/90"
-              >
-                <PlusIcon size={16} /> Neues Meeting
-              </button>
-              <button
-                onClick={() => onNavigate('tasks')}
-                className="inline-flex items-center justify-center gap-2 rounded-button border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-semibold text-white backdrop-blur-md transition hover:bg-white/15"
-              >
-                <CheckCircleIcon size={16} /> Aufgaben prüfen
-              </button>
-            </div>
-          </div>
         </aside>
       </div>
     </div>

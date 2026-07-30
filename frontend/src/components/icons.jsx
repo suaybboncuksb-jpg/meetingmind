@@ -62,6 +62,10 @@ export const ArrowRightIcon = (p) => (
   <Icon {...p}><path d="M5 12h14M13 6l6 6-6 6" /></Icon>
 )
 
+export const ArrowLeftIcon = (p) => (
+  <Icon {...p}><path d="M19 12H5M11 18l-6-6 6-6" /></Icon>
+)
+
 export const XIcon = (p) => (
   <Icon {...p}><path d="M6 6l12 12M18 6L6 18" /></Icon>
 )

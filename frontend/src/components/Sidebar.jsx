@@ -1,21 +1,26 @@
 import Logo from './Logo.jsx'
-import { HomeIcon, VideoIcon, CheckSquareIcon, UsersIcon, SettingsIcon, SparklesIcon } from './icons.jsx'
+import { HomeIcon, VideoIcon, CheckSquareIcon, SettingsIcon, SparklesIcon } from './icons.jsx'
 
 export const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', icon: HomeIcon },
-  { key: 'meetings', label: 'Meetings', icon: VideoIcon },
-  { key: 'tasks', label: 'Aufgaben', icon: CheckSquareIcon },
-  { key: 'projects', label: 'Projekte', icon: UsersIcon },
+  { key: 'meetings', label: 'Besprechungen', icon: VideoIcon },
+  { key: 'tasks', label: 'Aufgaben & Fristen', icon: CheckSquareIcon },
   { key: 'settings', label: 'Einstellungen', icon: SettingsIcon },
 ]
 
-export default function Sidebar({ current, onNavigate }) {
+export default function Sidebar({ current, onNavigate, user, onLogout }) {
+  const initials =
+    `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'MM'
+
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'MeetingMind Nutzer'
+
   return (
     <aside className="flex h-full w-64 flex-col overflow-hidden rounded-[28px] border border-line/80 bg-surface/86 shadow-card backdrop-blur-xl">
       <div className="border-b border-line/70 px-6 py-5">
         <Logo size={30} />
         <p className="mt-3 text-[12.5px] leading-relaxed text-muted">
-          Aus Meetings werden klare Aufgaben, Entscheidungen und Projektakten.
+          Aus Besprechungen werden klare Aufgaben, Entscheidungen und Aktennotizen.
         </p>
       </div>
 
@@ -54,17 +59,35 @@ export default function Sidebar({ current, onNavigate }) {
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-navy px-4 py-4 text-white shadow-soft">
           <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-brand/40 blur-2xl" />
           <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
-            <SparklesIcon size={18} className="text-[#9dc9ef]" />
+            <SparklesIcon size={18} className="text-brand" />
           </span>
-          <p className="relative mt-3 text-[13px] font-semibold">Demo-ready Sprint</p>
+          <p className="relative mt-3 text-[13px] font-semibold">Tagesfokus</p>
           <p className="relative mt-1 text-[12px] leading-relaxed text-white/70">
-            Nächster Fokus: KI-Analyse testen und Produkt optisch finalisieren.
+            Offene Aufgaben und Fristen aus aktuellen Mandaten im Blick behalten.
           </p>
         </div>
       </div>
 
-      <div className="border-t border-line/70 px-6 py-4 text-[11px] text-muted/70">
-        © {new Date().getFullYear()} MeetingMind
+      <div className="border-t border-line/70 px-4 py-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-navy text-[12px] font-semibold text-white shadow-soft">
+            {initials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-semibold text-ink">{displayName}</p>
+            <p className="truncate text-[12px] text-muted">{user?.email}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onLogout}
+          className="mt-3 w-full rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-semibold text-muted shadow-soft transition hover:bg-soft hover:text-ink"
+        >
+          Abmelden
+        </button>
+        <p className="mt-3 text-[11px] text-muted/70">
+          © {new Date().getFullYear()} MeetingMind
+        </p>
       </div>
     </aside>
   )

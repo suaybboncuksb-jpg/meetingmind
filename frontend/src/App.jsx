@@ -8,6 +8,7 @@ import {
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Meetings from './pages/Meetings.jsx'
+import MeetingDetail from './components/MeetingDetail.jsx'
 import Tasks from './pages/Tasks.jsx'
 import Projects from './pages/Projects.jsx'
 import Settings from './pages/Settings.jsx'
@@ -26,6 +27,7 @@ function App() {
   const [authLoading, setAuthLoading] = useState(true)
 
   const [page, setPage] = useState('dashboard')
+  const [selectedMeetingId, setSelectedMeetingId] = useState(null)
   const [meetings, setMeetings] = useState([])
   const [tasks, setTasks] = useState([])
   const [loadingMeetings, setLoadingMeetings] = useState(true)
@@ -45,6 +47,7 @@ function App() {
     setMeetings([])
     setTasks([])
     setPage('dashboard')
+    setSelectedMeetingId(null)
     setShowCreate(false)
     setShowCreateTask(false)
     setLoadingMeetings(false)
@@ -198,6 +201,16 @@ function App() {
 
   const openCreate = () => setShowCreate(true)
 
+  const handleOpenMeeting = (meetingId) => {
+    setSelectedMeetingId(meetingId)
+    setPage('meetingDetail')
+  }
+
+  const handleCloseMeetingDetail = () => {
+    setSelectedMeetingId(null)
+    setPage('meetings')
+  }
+
   const pages = {
     dashboard: (
       <Dashboard
@@ -214,7 +227,14 @@ function App() {
         meetings={meetings}
         loading={loadingMeetings}
         onNewMeeting={openCreate}
-        onMeetingUpdated={handleMeetingUpdated}
+        onOpenMeeting={handleOpenMeeting}
+      />
+    ),
+    meetingDetail: (
+      <MeetingDetail
+        meeting={meetings.find((m) => m.id === selectedMeetingId)}
+        onClose={handleCloseMeetingDetail}
+        onUpdated={handleMeetingUpdated}
         onTaskCreated={handleTaskCreated}
       />
     ),
