@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/tasks/{taskId}/comments")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class TaskCommentController {
 
     private final TaskCommentService taskCommentService;
