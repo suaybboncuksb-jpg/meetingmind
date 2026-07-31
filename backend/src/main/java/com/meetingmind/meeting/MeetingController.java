@@ -118,6 +118,14 @@ public class MeetingController {
         return ResponseEntity.ok(meetingService.calculateQualityScore(id, userId));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteMeeting(@PathVariable Long id, Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        meetingService.deleteMeeting(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     private Long currentUserId(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Nicht authentifiziert.");

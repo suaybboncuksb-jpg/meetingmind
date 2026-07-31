@@ -5,14 +5,13 @@ import EmptyState from '../components/ui/EmptyState.jsx'
 import StatusBadge from '../components/ui/StatusBadge.jsx'
 import Tabs from '../components/ui/Tabs.jsx'
 import Button from '../components/ui/Button.jsx'
-import MeetingDetail from '../components/MeetingDetail.jsx'
 import { PlusIcon, CalendarIcon, FileTextIcon, UsersIcon, CheckSquareIcon, ArrowRightIcon } from '../components/icons.jsx'
 import { formatDate, meetingDateOf, taskCountOf, sortByDateDesc } from '../lib/meetings.js'
 import { matchesSearch } from '../lib/search.js'
 
 const TABS = [
-  { key: 'all', label: 'Alle Meetings' },
-  { key: 'calendar', label: 'Kalenderansicht' },
+  { key: 'all', label: 'Alle Besprechungen' },
+  { key: 'calendar', label: 'Kalender' },
   { key: 'drafts', label: 'Entwürfe' },
 ]
 
@@ -34,9 +33,6 @@ function MeetingMetric({ icon: Icon, label, value, description, tone = 'neutral'
         <span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${toneClass}`}>
           <Icon size={18} />
         </span>
-        <span className="rounded-full bg-canvas px-2.5 py-1 text-[11px] font-semibold text-muted">
-          Live
-        </span>
       </div>
 
       <p className="mt-5 text-[30px] font-semibold tracking-[-0.045em] text-ink">{value}</p>
@@ -47,7 +43,7 @@ function MeetingMetric({ icon: Icon, label, value, description, tone = 'neutral'
 }
 
 
-function MeetingRow({ meeting, onOpen }) {
+function MeetingRow({ meeting, onOpen, onDelete }) {
   const taskCount = taskCountOf(meeting)
   const description = String(meeting.description || '').trim()
   const hasDescription = Boolean(description)
@@ -97,6 +93,17 @@ function MeetingRow({ meeting, onOpen }) {
 
         <div className="flex shrink-0 items-center gap-3 lg:justify-end">
           <StatusBadge status={meeting.status} />
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              if (window.confirm(`„${meeting.title || 'Diese Besprechung'}“ wirklich unwiderruflich löschen?`)) {
+                onDelete(meeting.id)
+              }
+            }}
+          >
+            Löschen
+          </Button>
           <Button size="sm" variant="secondary" iconRight={ArrowRightIcon} onClick={() => onOpen(meeting)}>
             Details
           </Button>
@@ -167,10 +174,9 @@ function CalendarView({ meetings, onOpen }) {
   )
 }
 
-export default function Meetings({ meetings = [], loading, onNewMeeting, onMeetingUpdated, onTaskCreated }) {
+export default function Meetings({ meetings = [], loading, onNewMeeting, onOpenMeeting, onDeleteMeeting }) {
   const [tab, setTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedId, setSelectedId] = useState(null)
 
   const sorted = useMemo(() => sortByDateDesc(meetings), [meetings])
   const searchableMeetings = useMemo(
@@ -183,7 +189,6 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
     [sorted, searchQuery],
   )
   const drafts = useMemo(() => searchableMeetings.filter((m) => m.status === 'DRAFT'), [searchableMeetings])
-  const selected = meetings.find((m) => m.id === selectedId) || null
 
   const meetingStats = useMemo(() => {
     const analyzedStatuses = new Set(['ANALYZED', 'COMPLETED'])
@@ -203,38 +208,38 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Meetings"
-        subtitle="Plane, analysiere und dokumentiere deine Meetings an einem zentralen Ort."
-        actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neues Meeting</Button>}
+        title="Besprechungen"
+        subtitle="Dokumentiere Mandanten- und Teambesprechungen zentral und erkenne Aufgaben, Fristen und offene Rückfragen automatisch."
+        actions={<Button icon={PlusIcon} onClick={onNewMeeting}>Neue Besprechung</Button>}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MeetingMetric
           icon={CalendarIcon}
-          label="Alle Meetings"
+          label="Besprechungen gesamt"
           value={meetingStats.total}
-          description="Gesamte Meeting-Historie im Workspace."
+          description="Gesamte Besprechungs-Historie im Workspace."
           tone="navy"
         />
         <MeetingMetric
           icon={FileTextIcon}
           label="Entwürfe"
           value={meetingStats.drafts}
-          description="Meetings, die noch nicht analysiert wurden."
+          description="Besprechungen, die noch nicht analysiert wurden."
           tone={meetingStats.drafts > 0 ? 'amber' : 'neutral'}
         />
         <MeetingMetric
           icon={CheckSquareIcon}
-          label="Analysiert"
+          label="Analysierte Protokolle"
           value={meetingStats.analyzed}
-          description="Meetings mit gespeicherter KI-Nachbereitung."
+          description="Besprechungen mit gespeicherter KI-Nachbereitung."
           tone="emerald"
         />
         <MeetingMetric
           icon={CheckSquareIcon}
-          label="Aufgaben"
+          label="Erkannte Aufgaben"
           value={meetingStats.tasks}
-          description="Erkannte oder manuell angelegte Action Items."
+          description="Erkannte oder manuell angelegte Aufgaben."
           tone="brand"
         />
       </div>
@@ -243,20 +248,20 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
             <p className="mb-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-muted">
-              Meeting Library
+              Besprechungsarchiv
             </p>
             <Tabs tabs={TABS} value={tab} onChange={setTab} />
           </div>
 
           <div className="w-full xl:max-w-md">
             <label htmlFor="meeting-search" className="mb-1.5 block text-[13px] font-medium text-ink">
-              Meetings durchsuchen
+              Besprechungen durchsuchen
             </label>
             <input
               id="meeting-search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Titel, Projekt/Kunde, Beschreibung oder Status…"
+              placeholder="Titel, Mandant, Beschreibung oder Status…"
               className="w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12"
             />
           </div>
@@ -268,33 +273,31 @@ export default function Meetings({ meetings = [], loading, onNewMeeting, onMeeti
           <div className="px-6 py-12 text-center text-[14px] text-muted">Wird geladen…</div>
         ) : tab === 'calendar' ? (
           searchableMeetings.length === 0 ? (
-            <EmptyState icon={CalendarIcon} title="Noch keine Meetings" description="Erstelle ein Meeting, um es im Kalender zu sehen."
-              action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>} />
+            <EmptyState icon={CalendarIcon} title="Noch keine Besprechungen erfasst" description="Erstelle eine Besprechung, um sie im Kalender zu sehen."
+              action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Besprechung erstellen</Button>} />
           ) : (
-            <CalendarView meetings={searchableMeetings} onOpen={(m) => setSelectedId(m.id)} />
+            <CalendarView meetings={searchableMeetings} onOpen={(m) => onOpenMeeting(m.id)} />
           )
         ) : list.length === 0 ? (
           <EmptyState
             icon={tab === 'drafts' ? FileTextIcon : CalendarIcon}
-            title={searchQuery ? 'Keine passenden Meetings' : (tab === 'drafts' ? 'Keine Entwürfe' : 'Noch keine Meetings')}
-            description={searchQuery ? 'Passe deine Suche an oder entferne den Suchbegriff.' : (tab === 'drafts' ? 'Entwürfe erscheinen hier, bis sie analysiert wurden.' : 'Erstelle dein erstes Meeting, um loszulegen.')}
-            action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Meeting erstellen</Button>}
+            title={searchQuery ? 'Keine passenden Besprechungen' : (tab === 'drafts' ? 'Keine Entwürfe' : 'Noch keine Besprechungen erfasst')}
+            description={searchQuery ? 'Passe deine Suche an oder entferne den Suchbegriff.' : (tab === 'drafts' ? 'Entwürfe erscheinen hier, bis sie analysiert wurden.' : 'Erstelle eine Besprechung oder analysiere ein Protokoll, damit MeetingMind Aufgaben, Zuständigkeiten, Fristen und offene Rückfragen erkennt.')}
+            action={<Button size="sm" variant="secondary" icon={PlusIcon} onClick={onNewMeeting}>Besprechung erstellen</Button>}
           />
         ) : (
           <ul className="space-y-3 p-4 sm:p-5">
-            {list.map((m) => <MeetingRow key={m.id} meeting={m} onOpen={(mm) => setSelectedId(mm.id)} />)}
+            {list.map((m) => (
+              <MeetingRow
+                key={m.id}
+                meeting={m}
+                onOpen={(mm) => onOpenMeeting(mm.id)}
+                onDelete={onDeleteMeeting}
+              />
+            ))}
           </ul>
         )}
       </DataCard>
-
-      {selected && (
-        <MeetingDetail
-          meeting={selected}
-          onClose={() => setSelectedId(null)}
-          onUpdated={(updated) => { onMeetingUpdated?.(updated); }}
-          onTaskCreated={onTaskCreated}
-        />
-      )}
     </div>
   )
 }

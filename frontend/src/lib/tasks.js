@@ -27,7 +27,7 @@ export function priorityLabel(priority) {
 export function statusLabel(status) {
   const labels = {
     OPEN: 'Offen',
-    IN_PROGRESS: 'In Arbeit',
+    IN_PROGRESS: 'In Bearbeitung',
     DONE: 'Erledigt',
   }
 
@@ -94,7 +94,7 @@ export function deadlineLabel(task) {
     today: 'Heute fällig',
     this_week: 'Diese Woche',
     planned: 'Geplant',
-    none: 'Ohne Deadline',
+    none: 'Ohne Frist',
     done: 'Erledigt',
   }
 

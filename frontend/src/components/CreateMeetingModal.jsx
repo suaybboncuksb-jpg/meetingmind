@@ -12,51 +12,71 @@ const inputClass =
 const MEETING_TEMPLATES = [
   {
     key: 'team',
-    label: 'Teammeeting',
+    label: 'Interne Kanzleibesprechung',
     hint: 'Interne Abstimmung',
-    title: 'Teammeeting',
+    title: 'Interne Kanzleibesprechung',
     description:
       'Agenda:\n- Aktueller Stand im Team\n- Offene Aufgaben\n- Blocker oder Probleme\n- Entscheidungen\n- Nächste Schritte',
   },
   {
     key: 'customer',
-    label: 'Kundenmeeting',
-    hint: 'Kunde / Projekt',
-    title: 'Kundenmeeting',
+    label: 'Mandantenbesprechung',
+    hint: 'Mandant / Aktenzeichen',
+    title: 'Mandantenbesprechung',
     description:
-      'Agenda:\n- Anliegen des Kunden\n- Aktueller Projektstand\n- Offene Fragen\n- Vereinbarte Aufgaben\n- Nächster Termin / Follow-up',
+      'Agenda:\n- Anliegen des Mandanten\n- Aktueller Sachstand\n- Offene Fragen\n- Vereinbarte Aufgaben\n- Nächster Termin / Nachbereitung',
   },
   {
     key: 'sprint',
-    label: 'Sprint Planning',
-    hint: 'Agiles Team',
-    title: 'Sprint Planning',
+    label: 'Fristenplanung',
+    hint: 'Termine & Fristen',
+    title: 'Fristenplanung',
     description:
-      'Agenda:\n- Ziel des Sprints\n- Geplante Aufgaben\n- Verantwortlichkeiten\n- Risiken / Abhängigkeiten\n- Definition of Done',
+      'Agenda:\n- Anstehende Fristen\n- Zuständigkeiten\n- Risiken / Abhängigkeiten\n- Priorisierung\n- Nächste Schritte',
   },
   {
     key: 'status',
-    label: 'Projektstatus',
+    label: 'Mandatsstatus',
     hint: 'Fortschritt prüfen',
-    title: 'Projektstatus',
+    title: 'Mandatsstatus',
     description:
       'Agenda:\n- Fortschritt seit dem letzten Termin\n- Erledigte Aufgaben\n- Offene Punkte\n- Risiken\n- Nächste Schritte',
   },
   {
     key: 'sales',
-    label: 'Vertriebsgespräch',
-    hint: 'Angebot / Bedarf',
-    title: 'Vertriebsgespräch',
+    label: 'Erstberatung',
+    hint: 'Bedarf & Erstgespräch',
+    title: 'Erstberatung',
     description:
-      'Agenda:\n- Bedarf des Kunden\n- Aktuelle Situation\n- Angebot / Lösungsvorschlag\n- Einwände oder offene Fragen\n- Nächste Schritte',
+      'Agenda:\n- Anliegen des Mandanten\n- Aktuelle Situation\n- Vorgehen / Lösungsvorschlag\n- Offene Fragen\n- Nächste Schritte',
   },
 ]
 
-/** Modal zum Anlegen eines Meetings (POST /api/meetings). */
+function combineMandantInfo(mandant, aktenzeichen) {
+  const cleanMandant = mandant.trim()
+  const cleanAktenzeichen = aktenzeichen.trim()
+
+  if (cleanMandant && cleanAktenzeichen) {
+    return `${cleanMandant} · Az. ${cleanAktenzeichen}`
+  }
+
+  if (cleanMandant) {
+    return cleanMandant
+  }
+
+  if (cleanAktenzeichen) {
+    return `Az. ${cleanAktenzeichen}`
+  }
+
+  return ''
+}
+
+/** Modal zum Anlegen einer Besprechung (POST /api/meetings). */
 export default function CreateMeetingModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [projectName, setProjectName] = useState('')
+  const [mandant, setMandant] = useState('')
+  const [aktenzeichen, setAktenzeichen] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -80,10 +100,10 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
 
     const cleanTitle = title.trim()
     const cleanDescription = description.trim()
-    const cleanProjectName = projectName.trim()
+    const combinedProjectName = combineMandantInfo(mandant, aktenzeichen)
 
     if (!cleanTitle) {
-      setError('Meeting-Titel darf nicht leer sein.')
+      setError('Titel darf nicht leer sein.')
       setSaving(false)
       return
     }
@@ -92,11 +112,11 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
       const res = await api.post('/meetings', {
         title: cleanTitle,
         description: cleanDescription || null,
-        projectName: cleanProjectName || null,
+        projectName: combinedProjectName || null,
       })
       onCreated(res.data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Meeting konnte nicht erstellt werden.'))
+      setError(getApiErrorMessage(err, 'Besprechung konnte nicht erstellt werden.'))
     } finally {
       setSaving(false)
     }
@@ -115,13 +135,13 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
           <div className="flex items-start justify-between gap-5">
             <div>
               <p className="text-[11.5px] font-semibold uppercase tracking-[0.18em] text-muted">
-                Meeting erstellen
+                Besprechung erstellen
               </p>
               <h2 className="mt-2 text-[24px] font-semibold tracking-[-0.035em] text-ink">
-                Neues Meeting
+                Neue Besprechung
               </h2>
               <p className="mt-1.5 max-w-xl text-[13px] leading-relaxed text-muted">
-                Starte mit einer Vorlage oder erstelle ein eigenes Meeting. Danach kannst du Transkript, KI-Analyse und Aufgaben hinzufügen.
+                Erstelle eine Mandanten- oder Teambesprechung und lasse MeetingMind daraus Aufgaben, Fristen, Zuständigkeiten und offene Rückfragen erkennen.
               </p>
             </div>
 
@@ -143,7 +163,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
               <div className="mb-4 flex items-start justify-between gap-4">
                 <div>
                   <p className="text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                    Meeting-Vorlage
+                    Besprechungsvorlage
                   </p>
                   <p className="mt-1 text-[13px] leading-relaxed text-muted">
                     Wähle eine passende Struktur für Agenda, Aufgaben und Nachbereitung.
@@ -194,7 +214,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
 
             <div className="rounded-[26px] border border-line bg-surface p-5 shadow-soft">
               <p className="mb-4 text-[12px] font-semibold uppercase tracking-[0.16em] text-muted">
-                Meeting-Daten
+                Besprechungsdaten
               </p>
 
               <div className="space-y-4">
@@ -207,27 +227,43 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
                     className={inputClass}
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="z. B. Sprint Planning KW 25"
+                    placeholder="z. B. Mandantenbesprechung Müller"
                     required
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="m-project" className="mb-1.5 block text-[13px] font-medium text-ink">
-                    Projekt / Kunde
-                    <span className="ml-1 font-normal text-muted">(optional)</span>
-                  </label>
-                  <input
-                    id="m-project"
-                    className={inputClass}
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                    placeholder="z. B. Müller GmbH oder Website-Relaunch"
-                  />
-                  <p className="mt-1.5 text-[12px] leading-relaxed text-muted">
-                    Wichtig für Projektakten, Verlauf und spätere Auswertung.
-                  </p>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="m-mandant" className="mb-1.5 block text-[13px] font-medium text-ink">
+                      Mandant
+                      <span className="ml-1 font-normal text-muted">(optional)</span>
+                    </label>
+                    <input
+                      id="m-mandant"
+                      className={inputClass}
+                      value={mandant}
+                      onChange={(e) => setMandant(e.target.value)}
+                      placeholder="z. B. Müller GmbH"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="m-aktenzeichen" className="mb-1.5 block text-[13px] font-medium text-ink">
+                      Aktenzeichen
+                      <span className="ml-1 font-normal text-muted">(optional)</span>
+                    </label>
+                    <input
+                      id="m-aktenzeichen"
+                      className={inputClass}
+                      value={aktenzeichen}
+                      onChange={(e) => setAktenzeichen(e.target.value)}
+                      placeholder="z. B. 123/2026"
+                    />
+                  </div>
                 </div>
+                <p className="-mt-2 text-[12px] leading-relaxed text-muted">
+                  Wichtig für Mandatsakten, Verlauf und spätere Auswertung.
+                </p>
 
                 <div>
                   <label htmlFor="m-desc" className="mb-1.5 block text-[13px] font-medium text-ink">
@@ -239,7 +275,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
                     className={`${inputClass} min-h-[150px] resize-y leading-relaxed`}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Worum geht es in diesem Meeting?"
+                    placeholder="Worum geht es in dieser Besprechung?"
                   />
                 </div>
               </div>
@@ -248,7 +284,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
             <div className="rounded-[24px] border border-blue-100 bg-blue-50 px-5 py-4">
               <p className="text-[13px] font-semibold text-brand">Nach dem Erstellen</p>
               <p className="mt-1 text-[12.5px] leading-relaxed text-brand/80">
-                Öffne das Meeting Command Center, füge dein Transkript ein und lasse MeetingMind Zusammenfassung, Aufgaben, Entscheidungen und offene Fragen vorbereiten.
+                Öffne die Besprechungsakte, füge dein Protokoll ein und lasse MeetingMind Zusammenfassung, Aufgaben, Entscheidungen und offene Fragen vorbereiten.
               </p>
             </div>
           </div>
@@ -258,7 +294,7 @@ export default function CreateMeetingModal({ onClose, onCreated }) {
               Abbrechen
             </Button>
             <Button type="submit" disabled={saving}>
-              {saving ? 'Wird erstellt…' : 'Meeting erstellen'}
+              {saving ? 'Wird erstellt…' : 'Besprechung erstellen'}
             </Button>
           </div>
         </form>

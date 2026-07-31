@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import Sidebar from './Sidebar.jsx'
 import Logo from './Logo.jsx'
-import { MenuIcon, SparklesIcon } from './icons.jsx'
+import { MenuIcon } from './icons.jsx'
 
 /**
  * AppLayout – Premium App-Shell mit Sidebar, Mobile-Drawer,
@@ -9,12 +9,6 @@ import { MenuIcon, SparklesIcon } from './icons.jsx'
  */
 export default function AppLayout({ user, current, onNavigate, onLogout, children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-
-  const initials =
-    `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || 'MM'
-
-  const displayName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'MeetingMind Nutzer'
 
   const navigate = (key) => {
     onNavigate(key)
@@ -31,7 +25,7 @@ export default function AppLayout({ user, current, onNavigate, onLogout, childre
 
       {/* Desktop-Sidebar */}
       <div className="fixed inset-y-0 left-0 z-40 hidden p-4 lg:block">
-        <Sidebar current={current} onNavigate={onNavigate} />
+        <Sidebar current={current} onNavigate={onNavigate} user={user} onLogout={onLogout} />
       </div>
 
       {/* Mobile-Drawer */}
@@ -42,53 +36,23 @@ export default function AppLayout({ user, current, onNavigate, onLogout, childre
             onClick={() => setMobileOpen(false)}
           />
           <div className="absolute inset-y-0 left-0 p-3">
-            <Sidebar current={current} onNavigate={navigate} />
+            <Sidebar current={current} onNavigate={navigate} user={user} onLogout={onLogout} />
           </div>
         </div>
       )}
 
       <div className="relative z-10 lg:pl-72">
-        {/* Topbar */}
-        <header className="sticky top-0 z-30 border-b border-line/70 bg-surface/72 backdrop-blur-xl">
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setMobileOpen(true)}
-                className="rounded-xl border border-line bg-surface p-2 text-muted shadow-soft transition hover:bg-soft hover:text-ink lg:hidden"
-                aria-label="Menü öffnen"
-              >
-                <MenuIcon size={20} />
-              </button>
-              <span className="lg:hidden">
-                <Logo size={28} />
-              </span>
-
-              <div className="hidden items-center gap-2 rounded-full border border-line bg-surface/70 px-3 py-1.5 text-[12.5px] font-medium text-muted shadow-soft md:flex">
-                <SparklesIcon size={15} className="text-brand" />
-                KI-gestützte Meeting-Nachbereitung
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="hidden text-right sm:block">
-                <p className="text-[13px] font-semibold text-ink">{displayName}</p>
-                <p className="text-[12px] text-muted">{user?.email}</p>
-              </div>
-
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-navy text-[12px] font-semibold text-white shadow-soft">
-                {initials}
-              </span>
-
-              <button
-                type="button"
-                onClick={onLogout}
-                className="rounded-xl border border-line bg-surface px-3 py-2 text-[13px] font-semibold text-muted shadow-soft transition hover:bg-soft hover:text-ink"
-              >
-                Abmelden
-              </button>
-            </div>
-          </div>
+        {/* Mobile-Header (nur < lg sichtbar, kein Desktop-Balken mehr) */}
+        <header className="flex items-center gap-3 px-4 py-3 sm:px-6 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="rounded-xl border border-line bg-surface p-2 text-muted shadow-soft transition hover:bg-soft hover:text-ink"
+            aria-label="Menü öffnen"
+          >
+            <MenuIcon size={20} />
+          </button>
+          <Logo size={28} />
         </header>
 
         <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-10">
