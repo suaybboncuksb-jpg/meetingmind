@@ -36,6 +36,9 @@ public class Meeting {
     @Column(columnDefinition = "TEXT")
     private String aiSummary;
 
+    @Column(columnDefinition = "TEXT")
+    private String participants;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -48,7 +51,6 @@ public class Meeting {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getter und Setter
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -75,6 +77,9 @@ public class Meeting {
 
     public String getAiSummary() { return aiSummary; }
     public void setAiSummary(String aiSummary) { this.aiSummary = aiSummary; }
+
+    public String getParticipants() { return participants; }
+    public void setParticipants(String participants) { this.participants = participants; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

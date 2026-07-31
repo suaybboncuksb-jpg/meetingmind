@@ -12,6 +12,7 @@ public record AnalysisPreviewDto(
     List<String> keyPoints,
     List<String> decisions,
     List<AnalysisPreviewTaskDto> actionItems,
+    List<AnalysisPreviewDeadlineDto> deadlines,
     List<String> nextSteps,
     List<String> questions,
     String rawResponse
@@ -26,6 +27,10 @@ public record AnalysisPreviewDto(
             result.getActionItemList()
                 .stream()
                 .map(AnalysisPreviewTaskDto::from)
+                .toList(),
+            result.getDeadlineList()
+                .stream()
+                .map(AnalysisPreviewDeadlineDto::from)
                 .toList(),
             splitLines(result.getNextSteps()),
             splitLines(result.getQuestions()),

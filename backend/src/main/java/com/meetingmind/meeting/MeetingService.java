@@ -54,6 +54,19 @@ public class MeetingService {
         return meetingRepository.save(meeting);
     }
 
+    public Meeting updateMeeting(Long meetingId, Long userId, String title, String description,
+                                  String projectName, String participants) {
+        Meeting meeting = getOwnedMeeting(meetingId, userId);
+
+        if (title != null) meeting.setTitle(requireText(title, "Meeting-Titel darf nicht leer sein."));
+        if (description != null) meeting.setDescription(emptyToNull(description));
+        if (projectName != null) meeting.setProjectName(emptyToNull(projectName));
+        if (participants != null) meeting.setParticipants(emptyToNull(participants));
+
+        meeting.setUpdatedAt(LocalDateTime.now());
+
+        return meetingRepository.save(meeting);
+    }
 
     public AnalysisPreviewDto previewAnalysis(Long meetingId, Long userId, String transcript) {
         getOwnedMeeting(meetingId, userId);
@@ -92,6 +105,7 @@ public class MeetingService {
         transcriptEntity.setKeyPoints(joinList(preview.keyPoints()));
         transcriptEntity.setDecisions(joinList(preview.decisions()));
         transcriptEntity.setActionItems(joinPreviewTasks(preview.actionItems()));
+        transcriptEntity.setDeadlines(joinPreviewDeadlines(preview.deadlines()));
         transcriptEntity.setNextSteps(joinList(preview.nextSteps()));
         transcriptEntity.setQuestions(joinList(preview.questions()));
         transcriptEntity.setMistralRawResponse(emptyToNull(preview.rawResponse()));
@@ -115,61 +129,12 @@ public class MeetingService {
         return meetingRepository.save(meeting);
     }
 
-    public Meeting analyzeMeeting(Long meetingId, Long userId, String transcript) {
-        Meeting meeting = getOwnedMeeting(meetingId, userId);
-        String cleanTranscript = requireText(transcript, "Transkript darf nicht leer sein.");
-
-        meeting.setStatus("ANALYZING");
-        meeting.setTranscript(cleanTranscript);
-        meetingRepository.save(meeting);
-
-        System.out.println("Starting Mistral analysis for meeting: " + meetingId);
-        MistralAnalysisResult analysisResult = mistralService.analyzeTranscript(cleanTranscript);
-
-        if (!analysisResult.isSuccessful()) {
-            meeting.setStatus("ANALYSIS_FAILED");
-            meeting.setUpdatedAt(LocalDateTime.now());
-            meetingRepository.save(meeting);
-
-            String reason = analysisResult.getErrorMessage();
-            String message = reason == null || reason.isBlank()
-                ? "KI-Analyse fehlgeschlagen."
-                : "KI-Analyse fehlgeschlagen: " + reason;
-
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, message);
-        }
-
-        Transcript transcriptEntity = transcriptRepository.findByMeeting(meeting)
-            .orElseGet(Transcript::new);
-        transcriptEntity.setMeeting(meeting);
-        transcriptEntity.setOriginalText(cleanTranscript);
-        transcriptEntity.setSummary(analysisResult.getSummary());
-        transcriptEntity.setKeyPoints(analysisResult.getKeyPoints());
-        transcriptEntity.setDecisions(analysisResult.getDecisions());
-        transcriptEntity.setActionItems(analysisResult.getActionItems());
-        transcriptEntity.setNextSteps(analysisResult.getNextSteps());
-        transcriptEntity.setQuestions(analysisResult.getQuestions());
-        transcriptEntity.setMistralRawResponse(analysisResult.getRawResponse());
-        transcriptEntity.setAnalysisStatus("COMPLETED");
-
-        transcriptRepository.save(transcriptEntity);
-
-        taskService.createFromActionItems(meeting, analysisResult.getActionItemList());
-
-        meeting.setStatus("ANALYZED");
-        meeting.setAiSummary(analysisResult.getSummary());
-        meeting.setUpdatedAt(LocalDateTime.now());
-
-        return meetingRepository.save(meeting);
-    }
-
     public List<Meeting> getUserMeetings(Long userId) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
         return meetingRepository.findByCreatedByOrderByMeetingDateDesc(user);
     }
-
 
     public MeetingAnalysisDto getAnalysisDetails(Long meetingId, Long userId) {
         Meeting meeting = getOwnedMeeting(meetingId, userId);
@@ -183,7 +148,6 @@ public class MeetingService {
         return getOwnedMeeting(meetingId, userId);
     }
 
-
     public MeetingQualityScoreDto calculateQualityScore(Long meetingId, Long userId) {
         Meeting meeting = getOwnedMeeting(meetingId, userId);
         Transcript transcript = transcriptRepository.findByMeeting(meeting).orElse(null);
@@ -196,7 +160,7 @@ public class MeetingService {
 
         int taskCount = tasks != null ? tasks.size() : 0;
         long assignedCount = tasks == null ? 0 : tasks.stream()
-            .filter(task -> hasText(task.getAssignee()))
+            .filter(task -> task.getAssignee() != null)
             .count();
         long deadlineCount = tasks == null ? 0 : tasks.stream()
             .filter(task -> task.getDeadline() != null)
@@ -236,11 +200,11 @@ public class MeetingService {
                 strengths.add("Alle Aufgaben haben eine Deadline.");
             } else {
                 warnings.add((taskCount - deadlineCount) + " Aufgabe(n) haben noch keine Deadline.");
-                recommendations.add("Fehlende Deadlines ergänzen, damit das Deadline-Radar zuverlässig funktioniert.");
+                recommendations.add("Fehlende Deadlines ergaenzen, damit das Deadline-Radar zuverlaessig funktioniert.");
             }
         } else {
             warnings.add("Es wurden keine Aufgaben erkannt.");
-            recommendations.add("Prüfen, ob aus dem Meeting konkrete To-dos abgeleitet werden sollten.");
+            recommendations.add("Pruefen, ob aus dem Meeting konkrete To-dos abgeleitet werden sollten.");
         }
 
         if (hasDecisions) {
@@ -253,16 +217,16 @@ public class MeetingService {
 
         if (hasNextSteps) {
             score += 10;
-            strengths.add("Nächste Schritte sind dokumentiert.");
+            strengths.add("Naechste Schritte sind dokumentiert.");
         } else {
-            warnings.add("Nächste Schritte fehlen oder sind unklar.");
-            recommendations.add("Am Ende jedes Meetings klare nächste Schritte festhalten.");
+            warnings.add("Naechste Schritte fehlen oder sind unklar.");
+            recommendations.add("Am Ende jedes Meetings klare naechste Schritte festhalten.");
         }
 
         if (hasQuestions) {
             score += 5;
             warnings.add("Es gibt offene Fragen, die nachverfolgt werden sollten.");
-            recommendations.add("Offene Fragen in konkrete Aufgaben oder Klärungspunkte überführen.");
+            recommendations.add("Offene Fragen in konkrete Aufgaben oder Klaerungspunkte ueberfuehren.");
         } else {
             score += 5;
             strengths.add("Es wurden keine offenen Fragen erkannt.");
@@ -281,9 +245,9 @@ public class MeetingService {
                 allDeadlines ? "Alle Aufgaben haben Deadlines." : "Es fehlen noch Deadlines."),
             new MeetingQualityCheckDto("Entscheidungen dokumentiert", hasDecisions,
                 hasDecisions ? "Entscheidungen wurden festgehalten." : "Es fehlen dokumentierte Entscheidungen."),
-            new MeetingQualityCheckDto("Nächste Schritte klar", hasNextSteps,
-                hasNextSteps ? "Nächste Schritte sind vorhanden." : "Nächste Schritte sind unklar."),
-            new MeetingQualityCheckDto("Offene Fragen geklärt", !hasQuestions,
+            new MeetingQualityCheckDto("Naechste Schritte klar", hasNextSteps,
+                hasNextSteps ? "Naechste Schritte sind vorhanden." : "Naechste Schritte sind unklar."),
+            new MeetingQualityCheckDto("Offene Fragen geklaert", !hasQuestions,
                 hasQuestions ? "Es gibt offene Fragen." : "Keine offenen Fragen erkannt.")
         );
 
@@ -309,7 +273,6 @@ public class MeetingService {
         );
     }
 
-
     public FollowUpDto generateFollowUp(Long meetingId, Long userId) {
         Meeting meeting = getOwnedMeeting(meetingId, userId);
         Transcript transcript = transcriptRepository.findByMeeting(meeting).orElse(null);
@@ -322,7 +285,7 @@ public class MeetingService {
         body.append("Hallo zusammen,\n\n");
         body.append("hier ist das Follow-up zu unserem Meeting");
         if (meeting.getTitle() != null && !meeting.getTitle().isBlank()) {
-            body.append(" „").append(meeting.getTitle()).append("“");
+            body.append(" \u201e").append(meeting.getTitle()).append("\u201c");
         }
         body.append(".\n\n");
 
@@ -339,17 +302,22 @@ public class MeetingService {
 
         appendTasksSection(body, tasks);
 
+        appendSection(body, "Fristen", firstNonBlank(
+            transcript != null ? transcript.getDeadlines() : null,
+            "Es wurden keine eigenstaendigen Fristen erkannt."
+        ));
+
         appendSection(body, "Offene Fragen", firstNonBlank(
             transcript != null ? transcript.getQuestions() : null,
             "Es wurden keine offenen Fragen erkannt."
         ));
 
-        appendSection(body, "Nächste Schritte", firstNonBlank(
+        appendSection(body, "Naechste Schritte", firstNonBlank(
             transcript != null ? transcript.getNextSteps() : null,
-            "Die nächsten Schritte ergeben sich aus den oben genannten Aufgaben."
+            "Die naechsten Schritte ergeben sich aus den oben genannten Aufgaben."
         ));
 
-        body.append("Viele Grüße");
+        body.append("Viele Gruesse");
 
         return new FollowUpDto(subject, body.toString());
     }
@@ -373,7 +341,6 @@ public class MeetingService {
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Meeting not found"));
     }
 
-
     private void appendSection(StringBuilder body, String title, String content) {
         body.append(title).append(":\n");
         body.append(content).append("\n\n");
@@ -390,16 +357,22 @@ public class MeetingService {
         for (Task task : tasks) {
             body.append("- ").append(task.getTitle());
 
-            if (task.getAssignee() != null && !task.getAssignee().isBlank()) {
-                body.append(" – Zuständig: ").append(task.getAssignee());
+            if (task.getAssignee() != null) {
+                String name = (task.getAssignee().getFirstName() + " " + task.getAssignee().getLastName()).trim();
+                body.append(" - Zustaendig: ").append(name);
+            } else if (task.getAiSuggestedAssigneeName() != null && !task.getAiSuggestedAssigneeName().isBlank()) {
+                body.append(" - Zustaendig: ").append(task.getAiSuggestedAssigneeName()).append(" (noch nicht zugeordnet)");
             } else {
-                body.append(" – Zuständig: noch offen");
+                body.append(" - Zustaendig: noch offen");
             }
 
             if (task.getDeadline() != null) {
-                body.append(" – Deadline: ").append(task.getDeadline());
+                body.append(" - Deadline: ").append(task.getDeadline());
+                if (task.isDeadlineEstimated()) {
+                    body.append(" (KI-Schaetzung)");
+                }
             } else {
-                body.append(" – Deadline: noch offen");
+                body.append(" - Deadline: noch offen");
             }
 
             body.append("\n");
@@ -422,7 +395,6 @@ public class MeetingService {
         return "";
     }
 
-
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
     }
@@ -440,16 +412,15 @@ public class MeetingService {
         }
 
         if (score >= 70) {
-            return "Dieses Meeting ist grundsätzlich gut strukturiert, hat aber noch einzelne Lücken.";
+            return "Dieses Meeting ist grundsaetzlich gut strukturiert, hat aber noch einzelne Luecken.";
         }
 
         if (score >= 50) {
-            return "Dieses Meeting enthält verwertbare Informationen, benötigt aber klarere Verantwortlichkeiten, Deadlines oder Entscheidungen.";
+            return "Dieses Meeting enthaelt verwertbare Informationen, benoetigt aber klarere Verantwortlichkeiten, Deadlines oder Entscheidungen.";
         }
 
-        return "Dieses Meeting ist schwer nachzubereiten. Es fehlen wichtige Informationen für Aufgaben, Entscheidungen oder nächste Schritte.";
+        return "Dieses Meeting ist schwer nachzubereiten. Es fehlen wichtige Informationen fuer Aufgaben, Entscheidungen oder naechste Schritte.";
     }
-
 
     private String nextBestAction(boolean hasSummary,
                                   boolean hasTasks,
@@ -461,12 +432,12 @@ public class MeetingService {
         if (!hasSummary) return "Starte oder wiederhole die KI-Analyse, damit eine klare Zusammenfassung entsteht.";
         if (!hasTasks) return "Leite konkrete Aufgaben aus dem Meeting ab.";
         if (!allAssigned) return "Weise offene Aufgaben einer verantwortlichen Person zu.";
-        if (!allDeadlines) return "Ergänze Deadlines für offene Aufgaben.";
+        if (!allDeadlines) return "Ergaenze Deadlines fuer offene Aufgaben.";
         if (!hasDecisions) return "Dokumentiere die wichtigsten Entscheidungen aus dem Meeting.";
-        if (!hasNextSteps) return "Formuliere klare nächste Schritte.";
-        if (hasQuestions) return "Klär offene Fragen oder überführe sie in Aufgaben.";
+        if (!hasNextSteps) return "Formuliere klare naechste Schritte.";
+        if (hasQuestions) return "Klaer offene Fragen oder ueberfuehre sie in Aufgaben.";
 
-        return "Das Meeting ist gut nachbereitbar. Prüfe nur noch, ob alle Beteiligten informiert wurden.";
+        return "Das Meeting ist gut nachbereitbar. Pruefe nur noch, ob alle Beteiligten informiert wurden.";
     }
 
     private String requireText(String value, String message) {
@@ -476,7 +447,6 @@ public class MeetingService {
 
         return value.trim();
     }
-
 
     private String joinList(List<String> values) {
         if (values == null || values.isEmpty()) {
@@ -510,6 +480,28 @@ public class MeetingService {
 
                 if (task.priority() != null && !task.priority().isBlank()) {
                     line.append(" {").append(task.priority().trim()).append("}");
+                }
+
+                return line.toString();
+            })
+            .reduce((a, b) -> a + "\n" + b)
+            .orElse("");
+    }
+
+    private String joinPreviewDeadlines(List<AnalysisPreviewDeadlineDto> deadlines) {
+        if (deadlines == null || deadlines.isEmpty()) {
+            return "";
+        }
+
+        return deadlines.stream()
+            .filter(d -> d.description() != null && !d.description().isBlank())
+            .map(d -> {
+                StringBuilder line = new StringBuilder(d.description().trim());
+
+                if (d.date() != null && !d.date().isBlank()) {
+                    line.append(" (").append(d.date().trim()).append(")");
+                } else {
+                    line.append(" (Datum unklar)");
                 }
 
                 return line.toString();

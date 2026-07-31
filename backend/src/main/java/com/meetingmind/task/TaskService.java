@@ -42,7 +42,7 @@ public class TaskService {
             .stream().map(TaskDto::from).toList();
     }
 
-    public TaskDto create(Long userId, Long meetingId, String title, String assignee,
+    public TaskDto create(Long userId, Long meetingId, String title, Long assigneeId,
                           String deadline, String status, String priority) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
@@ -58,8 +58,11 @@ public class TaskService {
         }
 
         task.setTitle(requireText(title, "Task-Titel darf nicht leer sein."));
-        task.setAssignee(emptyToNull(assignee));
+        task.setAssignee(resolveAssigneeById(assigneeId));
         task.setDeadline(parseDate(deadline));
+
+        task.setAiGenerated(false);
+        task.setConfirmed(true);
 
         if (status != null && !status.isBlank()) {
             task.setStatus(normalizeStatus(status));
@@ -81,18 +84,32 @@ public class TaskService {
         return TaskDto.from(taskRepository.save(task));
     }
 
-    public TaskDto update(Long taskId, Long userId, String title, String assignee,
+    public TaskDto update(Long taskId, Long userId, String title, Long assigneeId,
                           String deadline, String status, String priority) {
         Task task = getOwnedTask(taskId, userId);
 
         if (title != null) task.setTitle(requireText(title, "Task-Titel darf nicht leer sein."));
-        if (assignee != null) task.setAssignee(emptyToNull(assignee));
-        if (deadline != null) task.setDeadline(parseDate(deadline));
+        if (assigneeId != null) {
+            task.setAssignee(resolveAssigneeById(assigneeId));
+            task.setAiSuggestedAssigneeName(null);
+        }
+        if (deadline != null) {
+            task.setDeadline(parseDate(deadline));
+            task.setDeadlineEstimated(false);
+        }
         if (status != null && !status.isBlank()) task.setStatus(normalizeStatus(status));
         if (priority != null && !priority.isBlank()) task.setPriority(normalizePriority(priority));
 
+        task.setConfirmed(true);
         task.setUpdatedAt(LocalDateTime.now());
 
+        return TaskDto.from(taskRepository.save(task));
+    }
+
+    public TaskDto confirm(Long taskId, Long userId) {
+        Task task = getOwnedTask(taskId, userId);
+        task.setConfirmed(true);
+        task.setUpdatedAt(LocalDateTime.now());
         return TaskDto.from(taskRepository.save(task));
     }
 
@@ -113,6 +130,8 @@ public class TaskService {
             return;
         }
 
+        String workspaceName = meeting.getCreatedBy().getWorkspaceName();
+
         for (ActionItem item : items) {
             if (item.title() == null || item.title().isBlank()) continue;
 
@@ -120,8 +139,24 @@ public class TaskService {
             task.setOwner(meeting.getCreatedBy());
             task.setMeeting(meeting);
             task.setTitle(item.title().trim());
-            task.setAssignee(emptyToNull(item.assignee()));
+            task.setAiGenerated(true);
+            task.setConfirmed(false);
+
+            String suggestedName = item.assignee();
+            if (suggestedName != null && !suggestedName.isBlank()) {
+                User matched = resolveAssigneeByName(workspaceName, suggestedName);
+
+                if (matched != null) {
+                    task.setAssignee(matched);
+                } else {
+                    task.setAiSuggestedAssigneeName(suggestedName.trim());
+                }
+            }
+
             task.setDeadline(parseDate(item.deadline()));
+            if (task.getDeadline() != null) {
+                task.setDeadlineEstimated(true);
+            }
 
             if (item.priority() != null && !item.priority().isBlank()) {
                 task.setPriority(normalizePriority(item.priority()));
@@ -129,6 +164,39 @@ public class TaskService {
 
             taskRepository.save(task);
         }
+    }
+
+    private User resolveAssigneeByName(String workspaceName, String suggestedName) {
+        if (workspaceName == null || workspaceName.isBlank()) {
+            return null;
+        }
+
+        List<User> colleagues = userRepository.findByWorkspaceNameIgnoreCaseOrderByCreatedAtAsc(workspaceName);
+        String normalizedTarget = suggestedName.trim().toLowerCase();
+
+        List<User> matches = colleagues.stream()
+            .filter(u -> {
+                String firstName = u.getFirstName() == null ? "" : u.getFirstName().toLowerCase();
+                String fullName = (u.getFirstName() == null ? "" : u.getFirstName().toLowerCase())
+                    + " "
+                    + (u.getLastName() == null ? "" : u.getLastName().toLowerCase());
+
+                return normalizedTarget.equals(firstName)
+                    || normalizedTarget.equals(fullName.trim())
+                    || normalizedTarget.contains(firstName) && !firstName.isBlank();
+            })
+            .toList();
+
+        return matches.size() == 1 ? matches.get(0) : null;
+    }
+
+    private User resolveAssigneeById(Long assigneeId) {
+        if (assigneeId == null) {
+            return null;
+        }
+
+        return userRepository.findById(assigneeId)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Zugewiesener Nutzer wurde nicht gefunden."));
     }
 
     private Task getOwnedTask(Long taskId, Long userId) {
@@ -181,9 +249,5 @@ public class TaskService {
                 "Ungültiges Deadline-Format. Bitte YYYY-MM-DD verwenden."
             );
         }
-    }
-
-    private String emptyToNull(String value) {
-        return (value == null || value.isBlank()) ? null : value.trim();
     }
 }

@@ -46,46 +46,59 @@ public class MistralService {
     private String systemPrompt() {
         String today = LocalDate.now().toString();
 
-        return """
-            Du bist ein präziser Assistent für deutschsprachige Meeting-Analyse.
-            Heutiges Datum: %s.
+        StringBuilder sb = new StringBuilder();
+        sb.append("Du bist ein praeziser Assistent fuer deutschsprachige Meeting-Analyse, speziell fuer Kanzleien.\n");
+        sb.append("Heutiges Datum: ").append(today).append(".\n\n");
+        sb.append("Deine Aufgabe:\n");
+        sb.append("Extrahiere nur echte, umsetzbare Arbeitsergebnisse aus dem Meeting.\n\n");
+        sb.append("Antworte AUSSCHLIESSLICH mit gueltigem JSON in genau diesem Schema:\n");
+        sb.append("{\n");
+        sb.append("  \"summary\": \"2-3 Saetze Zusammenfassung\",\n");
+        sb.append("  \"keyPoints\": [\"wichtiger Punkt\", \"...\"],\n");
+        sb.append("  \"decisions\": [\"konkrete Entscheidung\", \"...\"],\n");
+        sb.append("  \"actionItems\": [\n");
+        sb.append("    {\n");
+        sb.append("      \"title\": \"konkrete Aufgabe mit Ergebnis\",\n");
+        sb.append("      \"assignee\": \"Name der verantwortlichen Person oder leer\",\n");
+        sb.append("      \"deadline\": \"YYYY-MM-DD oder leer\",\n");
+        sb.append("      \"priority\": \"LOW | MEDIUM | HIGH\"\n");
+        sb.append("    }\n");
+        sb.append("  ],\n");
+        sb.append("  \"deadlines\": [\n");
+        sb.append("    {\n");
+        sb.append("      \"description\": \"worum es bei der Frist geht\",\n");
+        sb.append("      \"date\": \"YYYY-MM-DD oder leer, falls nicht einmal geschaetzt werden kann\"\n");
+        sb.append("    }\n");
+        sb.append("  ],\n");
+        sb.append("  \"nextSteps\": [\"naechster Schritt\", \"...\"],\n");
+        sb.append("  \"questions\": [\"offene Frage\", \"...\"]\n");
+        sb.append("}\n\n");
+        sb.append("Regeln fuer actionItems:\n");
+        sb.append("- Nur echte To-dos aufnehmen, keine allgemeinen Stichpunkte.\n");
+        sb.append("- Jede Aufgabe muss als konkretes Ergebnis formuliert sein.\n");
+        sb.append("- Schlechte Titel wie 'Pruefen', 'Klaeren', 'Besprechen', 'Todo', 'Test' vermeiden.\n");
+        sb.append("- Besser: 'Angebotszahlen pruefen', 'Technische Fragen mit Kunden klaeren'.\n");
+        sb.append("- Wenn eine Person sagt 'ich uebernehme...', dann ist diese Person assignee.\n");
+        sb.append("- Wenn ein Sprecher klar eine Aufgabe uebernimmt, nutze den Sprechernamen als assignee.\n");
+        sb.append("- Relative Fristen wie 'bis Freitag', 'naechste Woche', 'in 3 Tagen' ausgehend vom heutigen Datum in YYYY-MM-DD umwandeln.\n");
+        sb.append("- Wenn keine Frist explizit genannt wird, aber der Kontext eine plausible Einschaetzung zulaesst\n");
+        sb.append("  (z.B. gesetzliche Fristen, typische Bearbeitungsdauer, Bezug auf ein anderes Datum im Gespraech),\n");
+        sb.append("  schaetze ein realistisches Datum. Nur wenn wirklich kein Anhaltspunkt existiert, deadline auf \"\" setzen.\n");
+        sb.append("- HIGH bei dringenden, kundenkritischen, blockierenden oder kurzfristigen Aufgaben.\n");
+        sb.append("- MEDIUM bei normalen Aufgaben.\n");
+        sb.append("- LOW bei optionalen oder weniger dringenden Aufgaben.\n");
+        sb.append("- Keine Duplikate erzeugen.\n\n");
+        sb.append("Regeln fuer deadlines (eigenstaendige Fristen, unabhaengig von actionItems):\n");
+        sb.append("- Erfasse Fristen, die im Gespraech erwaehnt werden, aber NICHT eindeutig einer bestimmten\n");
+        sb.append("  Aufgabe/Person zugeordnet sind (z.B. gesetzliche Fristen, Verfahrensfristen, Termine).\n");
+        sb.append("- Auch hier: wenn kein explizites Datum genannt wird, aber der Kontext eine Schaetzung zulaesst,\n");
+        sb.append("  schaetze das Datum. Nur bei voelliger Unklarheit date auf \"\" setzen.\n");
+        sb.append("- Keine Frist doppelt aufnehmen, die bereits eindeutig einem actionItem zugeordnet ist.\n\n");
+        sb.append("Allgemein:\n");
+        sb.append("- Verwende leere Arrays, wenn nichts zutrifft.\n");
+        sb.append("- Kein Text ausserhalb des JSON.\n");
 
-            Deine Aufgabe:
-            Extrahiere nur echte, umsetzbare Arbeitsergebnisse aus dem Meeting.
-
-            Antworte AUSSCHLIESSLICH mit gültigem JSON in genau diesem Schema:
-            {
-              "summary": "2-3 Sätze Zusammenfassung",
-              "keyPoints": ["wichtiger Punkt", "..."],
-              "decisions": ["konkrete Entscheidung", "..."],
-              "actionItems": [
-                {
-                  "title": "konkrete Aufgabe mit Ergebnis",
-                  "assignee": "Name der verantwortlichen Person oder leer",
-                  "deadline": "YYYY-MM-DD oder leer",
-                  "priority": "LOW | MEDIUM | HIGH"
-                }
-              ],
-              "nextSteps": ["nächster Schritt", "..."],
-              "questions": ["offene Frage", "..."]
-            }
-
-            Regeln für actionItems:
-            - Nur echte To-dos aufnehmen, keine allgemeinen Stichpunkte.
-            - Jede Aufgabe muss als konkretes Ergebnis formuliert sein.
-            - Schlechte Titel wie "Prüfen", "Klären", "Besprechen", "Todo", "Test" vermeiden.
-            - Besser: "Angebotszahlen prüfen", "Technische Fragen mit Kunden klären".
-            - Wenn eine Person sagt "ich übernehme...", dann ist diese Person assignee.
-            - Wenn ein Sprecher klar eine Aufgabe übernimmt, nutze den Sprechernamen als assignee.
-            - Relative Fristen wie "bis Freitag", "nächste Woche", "in 3 Tagen" ausgehend vom heutigen Datum in YYYY-MM-DD umwandeln.
-            - Wenn keine Frist genannt ist, deadline auf "" setzen.
-            - HIGH bei dringenden, kundenkritischen, blockierenden oder kurzfristigen Aufgaben.
-            - MEDIUM bei normalen Aufgaben.
-            - LOW bei optionalen oder weniger dringenden Aufgaben.
-            - Keine Duplikate erzeugen.
-            - Verwende leere Arrays, wenn nichts zutrifft.
-            - Kein Text außerhalb des JSON.
-            """.formatted(today);
+        return sb.toString();
     }
 
     private String callMistralAPI(String transcript) throws Exception {
@@ -102,7 +115,7 @@ public class MistralService {
                 "messages", List.of(
                     Map.of("role", "system", "content", systemPrompt()),
                     Map.of("role", "user", "content",
-                        "Analysiere das folgende Meeting-Transkript und extrahiere präzise Aufgaben:\n\n" + transcript)
+                        "Analysiere das folgende Meeting-Transkript und extrahiere praezise Aufgaben und Fristen:\n\n" + transcript)
                 )
             );
 
@@ -132,6 +145,7 @@ public class MistralService {
 
         JsonNode data = mapper.readTree(content);
         List<ActionItem> actionItems = extractActionItems(data.path("actionItems"));
+        List<DeadlineItem> deadlineItems = extractDeadlineItems(data.path("deadlines"));
 
         MistralAnalysisResult result = new MistralAnalysisResult(
             data.path("summary").asText(""),
@@ -140,14 +154,15 @@ public class MistralService {
             buildActionItems(actionItems),
             joinLines(data.path("nextSteps")),
             joinLines(data.path("questions")),
+            buildDeadlines(deadlineItems),
             content
         );
 
         result.setActionItemList(actionItems);
+        result.setDeadlineList(deadlineItems);
         return result;
     }
 
-    /** Action Items als strukturierte Liste mit Validierung und Duplikatfilter. */
     private List<ActionItem> extractActionItems(JsonNode array) {
         List<ActionItem> items = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -191,6 +206,46 @@ public class MistralService {
         return items;
     }
 
+    private List<DeadlineItem> extractDeadlineItems(JsonNode array) {
+        List<DeadlineItem> items = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+
+        if (array == null || !array.isArray()) {
+            return items;
+        }
+
+        for (JsonNode node : array) {
+            String description;
+            String date;
+
+            if (node.isTextual()) {
+                description = node.asText("");
+                date = "";
+            } else {
+                description = node.path("description").asText("");
+                date = node.path("date").asText("");
+            }
+
+            String cleanDescription = cleanText(description)
+                .replaceAll("^[\\-•*]+\\s*", "")
+                .replaceAll("\\.$", "")
+                .trim();
+
+            if (cleanDescription.isBlank() || cleanDescription.length() < 5) {
+                continue;
+            }
+
+            String cleanDate = normalizeDeadline(date);
+            String key = (cleanDescription + "|" + cleanDate).toLowerCase();
+
+            if (seen.add(key)) {
+                items.add(new DeadlineItem(cleanDescription, cleanDate));
+            }
+        }
+
+        return items;
+    }
+
     private ActionItem normalizeActionItem(String title, String assignee, String deadline, String priority) {
         String cleanTitle = cleanText(title)
             .replaceAll("^[\\-•*]+\\s*", "")
@@ -219,8 +274,8 @@ public class MistralService {
             "todo",
             "aufgabe",
             "machen",
-            "prüfen",
-            "klären",
+            "pruefen",
+            "klaeren",
             "besprechen",
             "vorbereiten",
             "nachfragen"
@@ -274,7 +329,6 @@ public class MistralService {
         return value == null ? "" : value.replaceAll("\\s+", " ").trim();
     }
 
-    /** String-Array oder Objekte -> eine Zeile pro Eintrag. */
     private String joinLines(JsonNode array) {
         if (array == null || !array.isArray()) return "";
 
@@ -319,6 +373,26 @@ public class MistralService {
         return sb.toString();
     }
 
+    private String buildDeadlines(List<DeadlineItem> items) {
+        if (items == null || items.isEmpty()) return "";
+
+        StringBuilder sb = new StringBuilder();
+
+        for (DeadlineItem item : items) {
+            if (sb.length() > 0) sb.append("\n");
+
+            sb.append(item.description());
+
+            if (item.date() != null && !item.date().isBlank()) {
+                sb.append(" (").append(item.date()).append(")");
+            } else {
+                sb.append(" (Datum unklar)");
+            }
+        }
+
+        return sb.toString();
+    }
+
     private MistralAnalysisResult createErrorResult(String reason) {
         String cleanReason = reason == null || reason.isBlank()
             ? "Unbekannter Analysefehler"
@@ -326,7 +400,7 @@ public class MistralService {
 
         MistralAnalysisResult result = new MistralAnalysisResult(
             "",
-            "", "", "", "", "",
+            "", "", "", "", "", "",
             cleanReason
         );
 

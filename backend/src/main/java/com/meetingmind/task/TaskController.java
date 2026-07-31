@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/tasks")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
 public class TaskController {
 
     private final TaskService taskService;
@@ -34,12 +33,13 @@ public class TaskController {
 
         Long userId = currentUserId(authentication);
         Long meetingId = toLong(body.get("meetingId"));
+        Long assigneeId = toLong(body.get("assigneeId"));
 
         TaskDto created = taskService.create(
             userId,
             meetingId,
             (String) body.get("title"),
-            (String) body.get("assignee"),
+            assigneeId,
             (String) body.get("deadline"),
             (String) body.get("status"),
             (String) body.get("priority")
@@ -55,12 +55,13 @@ public class TaskController {
             Authentication authentication) {
 
         Long userId = currentUserId(authentication);
+        Long assigneeId = toLong(body.get("assigneeId"));
 
         return ResponseEntity.ok(taskService.update(
             id,
             userId,
             (String) body.get("title"),
-            (String) body.get("assignee"),
+            assigneeId,
             (String) body.get("deadline"),
             (String) body.get("status"),
             (String) body.get("priority")
@@ -76,6 +77,13 @@ public class TaskController {
         Long userId = currentUserId(authentication);
 
         return ResponseEntity.ok(taskService.updateStatus(id, userId, body.get("status")));
+    }
+
+    @PutMapping("/{id}/confirm")
+    public ResponseEntity<TaskDto> confirm(@PathVariable Long id, Authentication authentication) {
+        Long userId = currentUserId(authentication);
+
+        return ResponseEntity.ok(taskService.confirm(id, userId));
     }
 
     @DeleteMapping("/{id}")
@@ -108,7 +116,7 @@ public class TaskController {
         } catch (NumberFormatException e) {
             throw new ResponseStatusException(
                 HttpStatus.BAD_REQUEST,
-                "meetingId muss eine gültige Zahl sein."
+                "assigneeId/meetingId müssen gültige Zahlen sein."
             );
         }
     }

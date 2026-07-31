@@ -13,7 +13,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/meetings")
-@CrossOrigin(origins = "http://localhost:5173")
 public class MeetingController {
 
     @Autowired
@@ -33,6 +32,25 @@ public class MeetingController {
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<MeetingDto> updateMeeting(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> request,
+            Authentication authentication) {
+
+        Long userId = currentUserId(authentication);
+
+        Meeting meeting = meetingService.updateMeeting(
+            id,
+            userId,
+            (String) request.get("title"),
+            (String) request.get("description"),
+            (String) request.get("projectName"),
+            (String) request.get("participants")
+        );
+
+        return ResponseEntity.ok(MeetingDto.from(meeting));
+    }
 
     @PostMapping("/{id}/analysis-preview")
     public ResponseEntity<AnalysisPreviewDto> previewAnalysis(
@@ -58,20 +76,6 @@ public class MeetingController {
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
-
-    @PostMapping("/{id}/analyze")
-    public ResponseEntity<MeetingDto> analyzeMeeting(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> request,
-            Authentication authentication) {
-
-        String transcript = request.get("transcript");
-        Long userId = currentUserId(authentication);
-
-        Meeting meeting = meetingService.analyzeMeeting(id, userId, transcript);
-        return ResponseEntity.ok(MeetingDto.from(meeting));
-    }
-
     @GetMapping
     public ResponseEntity<List<MeetingDto>> getUserMeetings(Authentication authentication) {
         Long userId = currentUserId(authentication);
@@ -90,8 +94,6 @@ public class MeetingController {
         return ResponseEntity.ok(MeetingDto.from(meeting));
     }
 
-
-
     @GetMapping("/{id}/analysis")
     public ResponseEntity<MeetingAnalysisDto> getAnalysisDetails(
             @PathVariable Long id,
@@ -102,14 +104,12 @@ public class MeetingController {
         return ResponseEntity.ok(meetingService.getAnalysisDetails(id, userId));
     }
 
-
     @GetMapping("/{id}/follow-up")
     public ResponseEntity<FollowUpDto> getFollowUp(@PathVariable Long id, Authentication authentication) {
         Long userId = currentUserId(authentication);
 
         return ResponseEntity.ok(meetingService.generateFollowUp(id, userId));
     }
-
 
     @GetMapping("/{id}/quality-score")
     public ResponseEntity<MeetingQualityScoreDto> getQualityScore(@PathVariable Long id, Authentication authentication) {

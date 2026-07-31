@@ -38,6 +38,9 @@ public class Transcript {
     private String questions;
 
     @Column(columnDefinition = "TEXT")
+    private String deadlines;
+
+    @Column(columnDefinition = "TEXT")
     private String mistralRawResponse;
 
     @Column(nullable = false)
@@ -55,7 +58,6 @@ public class Transcript {
         this.updatedAt = LocalDateTime.now();
     }
 
-    // Getter und Setter
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -82,6 +84,9 @@ public class Transcript {
 
     public String getQuestions() { return questions; }
     public void setQuestions(String questions) { this.questions = questions; }
+
+    public String getDeadlines() { return deadlines; }
+    public void setDeadlines(String deadlines) { this.deadlines = deadlines; }
 
     public String getMistralRawResponse() { return mistralRawResponse; }
     public void setMistralRawResponse(String mistralRawResponse) { this.mistralRawResponse = mistralRawResponse; }
