@@ -9,7 +9,6 @@ const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[15px] text-ink ' +
   'placeholder:text-muted/70 outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/12'
 
-
 function memberLabel(member) {
   const name = [member?.firstName, member?.lastName].filter(Boolean).join(' ').trim()
 
@@ -19,7 +18,7 @@ function memberLabel(member) {
 /** Modal zum manuellen Anlegen einer Aufgabe (POST /api/tasks). */
 export default function CreateTaskModal({ meetings = [], user, onClose, onCreated }) {
   const [title, setTitle] = useState('')
-  const [assignee, setAssignee] = useState('')
+  const [assigneeId, setAssigneeId] = useState('')
   const [deadline, setDeadline] = useState('')
   const [priority, setPriority] = useState('MEDIUM')
   const [meetingId, setMeetingId] = useState('')
@@ -28,7 +27,7 @@ export default function CreateTaskModal({ meetings = [], user, onClose, onCreate
   const [teamMembers, setTeamMembers] = useState([])
 
   const fallbackMember = user ? {
-    id: user.id || user.email || 'me',
+    id: user.id,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
@@ -40,7 +39,6 @@ export default function CreateTaskModal({ meetings = [], user, onClose, onCreate
     : fallbackMember
       ? [fallbackMember]
       : []
-
 
   useEffect(() => {
     let cancelled = false
@@ -82,7 +80,7 @@ export default function CreateTaskModal({ meetings = [], user, onClose, onCreate
     try {
       const res = await api.post('/tasks', {
         title: cleanTitle,
-        assignee: assignee.trim() || null,
+        assigneeId: assigneeId ? Number(assigneeId) : null,
         deadline: deadline || null,
         priority,
         meetingId: meetingId ? Number(meetingId) : null,
@@ -118,14 +116,14 @@ export default function CreateTaskModal({ meetings = [], user, onClose, onCreate
               <select
                 id="t-assignee"
                 className={inputClass}
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
               >
                 <option value="">— Keine Zuständige —</option>
                 {effectiveTeamMembers.map((member) => {
                   const label = memberLabel(member)
                   return label ? (
-                    <option key={member.id || member.email} value={label}>{label}</option>
+                    <option key={member.id} value={member.id}>{label}</option>
                   ) : null
                 })}
               </select>

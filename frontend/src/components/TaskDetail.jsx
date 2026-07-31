@@ -5,7 +5,7 @@ import ErrorAlert from './ui/ErrorAlert.jsx'
 import StatusBadge from './ui/StatusBadge.jsx'
 import { ArrowLeftIcon } from './icons.jsx'
 import { getApiErrorMessage } from '../lib/apiErrors.js'
-import { isUnassignedTask, getDeadlineState, formatDeadline, priorityLabel } from '../lib/tasks.js'
+import { isUnassignedTask, assigneeDisplayLabel, getDeadlineState, formatDeadline, priorityLabel } from '../lib/tasks.js'
 
 const inputClass =
   'w-full rounded-button border border-line bg-surface px-3.5 py-3 text-[14px] text-ink ' +
@@ -43,15 +43,16 @@ function MetaTile({ label, value, hint }) {
   )
 }
 
-export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAssigneeChange, onDelete }) {
+export default function TaskDetail({ task, user, onClose, onTaskUpdate, onDelete }) {
   const [draft, setDraft] = useState({
     title: '',
-    assignee: '',
+    assigneeId: '',
     deadline: '',
     priority: 'MEDIUM',
     status: 'OPEN',
   })
   const [saving, setSaving] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const [changingStatus, setChangingStatus] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
@@ -63,10 +64,8 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
   const [teamMembers, setTeamMembers] = useState([])
   const [loadingTeamMembers, setLoadingTeamMembers] = useState(false)
 
-  const currentUserLabel = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.name || user?.email || 'Ich'
-
   const fallbackMember = user ? {
-    id: user.id || user.email || 'me',
+    id: user.id,
     email: user.email,
     firstName: user.firstName,
     lastName: user.lastName,
@@ -114,7 +113,7 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
 
     setDraft({
       title: task.title || '',
-      assignee: task.assignee || '',
+      assigneeId: task.assigneeId ? String(task.assigneeId) : '',
       deadline: task.deadline || '',
       priority: task.priority || 'MEDIUM',
       status: task.status || 'OPEN',
@@ -170,6 +169,8 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
   const unassigned = isUnassignedTask(task) && task.status !== 'DONE'
   const deadlineState = getDeadlineState(task)
   const isOverdue = deadlineState === 'overdue'
+  const needsConfirmation = task.aiGenerated && !task.confirmed
+  const label = assigneeDisplayLabel(task)
 
   async function handleCreateComment(event) {
     event.preventDefault()
@@ -199,13 +200,13 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
   async function handleSave(changes = null) {
     const payload = changes || {
       title: draft.title.trim(),
-      assignee: draft.assignee.trim() || null,
+      assigneeId: draft.assigneeId ? Number(draft.assigneeId) : null,
       deadline: draft.deadline || null,
       priority: draft.priority,
       status: draft.status,
     }
 
-    if (!payload.title && !changes) {
+    if (!changes && !payload.title) {
       setError('Der Aufgabentitel darf nicht leer sein.')
       return
     }
@@ -222,18 +223,26 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
     }
   }
 
-  async function handleAssignToMe() {
-    setDraft((prev) => ({ ...prev, assignee: currentUserLabel }))
-
-    if (onTaskUpdate) {
-      await handleSave({ assignee: currentUserLabel })
-      return
-    }
+  /** Bestätigt einen KI-Vorschlag unverändert (Backend setzt confirmed=true bei jedem Update). */
+  async function handleConfirmSuggestion() {
+    setConfirming(true)
+    setError('')
 
     try {
-      await onTaskAssigneeChange?.(task.id, currentUserLabel)
+      await onTaskUpdate?.(task.id, {})
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Zuständige Person konnte nicht gespeichert werden.'))
+      setError(getApiErrorMessage(err, 'Vorschlag konnte nicht bestätigt werden.'))
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  async function handleAssignToMe() {
+    const myId = user?.id ? String(user.id) : ''
+    setDraft((prev) => ({ ...prev, assigneeId: myId }))
+
+    if (myId) {
+      await handleSave({ assigneeId: Number(myId) })
     }
   }
 
@@ -296,16 +305,38 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
           <div className="mx-auto max-w-3xl space-y-5">
             <ErrorAlert message={error} />
 
+            {needsConfirmation && (
+              <div className="rounded-[20px] border border-brand/25 bg-brand/[0.06] px-4 py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[13px] font-semibold text-brand">KI-Vorschlag – noch nicht bestätigt</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-ink/70">
+                      Diese Aufgabe wurde automatisch aus einer Besprechung erkannt. Bitte prüfen und bestätigen.
+                    </p>
+                  </div>
+                  <Button size="sm" disabled={confirming} onClick={handleConfirmSuggestion}>
+                    {confirming ? 'Bestätigt…' : 'Vorschlag bestätigen'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <MetaTile
                 label="Frist"
                 value={formatDeadline(task.deadline)}
-                hint={isOverdue ? 'Frist überschritten' : null}
+                hint={
+                  isOverdue
+                    ? 'Frist überschritten'
+                    : task.deadlineEstimated
+                      ? 'KI-Schätzung, bitte prüfen'
+                      : null
+                }
               />
               <MetaTile label="Priorität" value={priorityLabel(task.priority)} />
               <MetaTile
                 label="Zuständige Person"
-                value={task.assignee || 'Nicht zugeordnet'}
+                value={label || 'Nicht zugeordnet'}
               />
               <MetaTile
                 label="Besprechung"
@@ -313,7 +344,7 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
               />
             </div>
 
-            {unassigned && (
+            {unassigned && !task.aiSuggestedAssigneeName && (
               <div className="rounded-[20px] border border-brand/25 bg-brand/[0.06] px-4 py-3.5">
                 <p className="text-[13px] font-semibold text-brand">Zuständige Person fehlt</p>
                 <p className="mt-1 text-[12.5px] leading-relaxed text-ink/70">
@@ -339,21 +370,27 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
                 <div>
                   <label className="mb-1.5 block text-[13px] font-medium text-ink">Zuständige Person</label>
                   <select
-                    value={draft.assignee}
-                    onChange={(event) => setDraft((prev) => ({ ...prev, assignee: event.target.value }))}
+                    value={draft.assigneeId}
+                    onChange={(event) => setDraft((prev) => ({ ...prev, assigneeId: event.target.value }))}
                     className={inputClass}
                   >
                     <option value="">— Keine zuständige Person —</option>
                     {effectiveTeamMembers.map((member) => {
-                      const label = memberLabel(member)
-                      return label ? (
-                        <option key={member.id || member.email} value={label}>{label}</option>
+                      const name = memberLabel(member)
+                      return name ? (
+                        <option key={member.id} value={member.id}>{name}</option>
                       ) : null
                     })}
                   </select>
-                  <p className="mt-1.5 text-[12px] text-muted">
-                    Auswahl aus deinem Kanzleiteam. Neue Mitglieder kannst du in den Einstellungen einladen.
-                  </p>
+                  {task.aiSuggestedAssigneeName && !task.assigneeId ? (
+                    <p className="mt-1.5 text-[12px] text-brand">
+                      KI erkannte im Protokoll: „{task.aiSuggestedAssigneeName}“ — bitte einer echten Person zuordnen.
+                    </p>
+                  ) : (
+                    <p className="mt-1.5 text-[12px] text-muted">
+                      Auswahl aus deinem Kanzleiteam. Neue Mitglieder kannst du in den Einstellungen einladen.
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -365,6 +402,9 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
                       onChange={(event) => setDraft((prev) => ({ ...prev, deadline: event.target.value }))}
                       className={inputClass}
                     />
+                    {task.deadlineEstimated ? (
+                      <p className="mt-1.5 text-[12px] text-brand">KI-Schätzung — bitte prüfen und ggf. anpassen.</p>
+                    ) : null}
                   </div>
 
                   <div>
@@ -398,7 +438,7 @@ export default function TaskDetail({ task, user, onClose, onTaskUpdate, onTaskAs
                   <Button
                     size="sm"
                     variant="secondary"
-                    disabled={saving}
+                    disabled={saving || !user?.id}
                     onClick={handleAssignToMe}
                   >
                     Ich übernehme diese Aufgabe

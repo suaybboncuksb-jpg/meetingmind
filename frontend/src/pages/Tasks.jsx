@@ -7,6 +7,7 @@ import Button from '../components/ui/Button.jsx'
 import { CheckSquareIcon, PlusIcon, SparklesIcon, ArrowRightIcon } from '../components/icons.jsx'
 import {
   isUnassignedTask,
+  assigneeDisplayLabel,
   deadlineLabel,
   deadlineBadgeClass,
   formatDeadline,
@@ -52,7 +53,21 @@ function DeadlineBadge({ task }) {
         {deadlineLabel(task)}
       </span>
       <span className="text-[12px] text-muted">{formatDeadline(task.deadline)}</span>
+      {task.deadlineEstimated ? (
+        <span className="text-[10.5px] font-semibold text-brand">KI-Schätzung</span>
+      ) : null}
     </div>
+  )
+}
+
+/** Kleiner Hinweis-Pill, falls die Aufgabe ein noch unbestätigter KI-Vorschlag ist. */
+function AiSuggestionPill({ task }) {
+  if (!task.aiGenerated || task.confirmed) return null
+
+  return (
+    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[10.5px] font-semibold text-brand">
+      KI-Vorschlag · zu bestätigen
+    </span>
   )
 }
 
@@ -75,7 +90,8 @@ export default function Tasks({
         task.title,
         task.meetingTitle,
         task.projectName,
-        task.assignee,
+        task.assigneeName,
+        task.aiSuggestedAssigneeName,
         task.status,
         task.priority,
         task.deadline,
@@ -163,6 +179,7 @@ export default function Tasks({
               <tbody className="divide-y divide-line">
                 {filtered.map((task) => {
                   const unassigned = isUnassignedTask(task) && task.status !== 'DONE'
+                  const label = assigneeDisplayLabel(task)
 
                   return (
                     <tr
@@ -170,7 +187,12 @@ export default function Tasks({
                       className="cursor-pointer hover:bg-canvas"
                       onClick={() => onOpenTask(task.id)}
                     >
-                      <td className="px-6 py-3 font-medium text-ink">{task.title}</td>
+                      <td className="px-6 py-3 font-medium text-ink">
+                        <div className="flex flex-col">
+                          {task.title}
+                          <AiSuggestionPill task={task} />
+                        </div>
+                      </td>
                       <td className="px-6 py-3">
                         <div className="flex flex-col gap-1">
                           <span className="text-muted">{task.meetingTitle || '—'}</span>
@@ -182,12 +204,14 @@ export default function Tasks({
                         </div>
                       </td>
                       <td className="px-6 py-3">
-                        {unassigned ? (
+                        {unassigned && !label ? (
                           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
                             Keine zuständige Person
                           </span>
                         ) : (
-                          <span className="text-muted">{task.assignee || '—'}</span>
+                          <span className={task.assigneeName ? 'text-muted' : 'text-brand'}>
+                            {label || '—'}
+                          </span>
                         )}
                       </td>
                       <td className="px-6 py-3"><DeadlineBadge task={task} /></td>

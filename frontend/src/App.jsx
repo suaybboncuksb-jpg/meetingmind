@@ -157,27 +157,7 @@ function App() {
     }
   }
 
-  const handleTaskAssigneeChange = async (taskId, assigneeName) => {
-    const cleanAssignee = String(assigneeName || '').trim()
-
-    if (!cleanAssignee) return
-
-    const previousTasks = tasks
-
-    setTasks((prev) => prev.map((t) => (
-      t.id === taskId ? { ...t, assignee: cleanAssignee } : t
-    )))
-
-    try {
-      const res = await api.put(`/tasks/${taskId}`, { assignee: cleanAssignee })
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...res.data } : t)))
-    } catch (err) {
-      setTasks(previousTasks)
-      loadTasks()
-      throw err
-    }
-  }
-
+  /** Generischer Update-Handler: reicht beliebige Felder (title, assigneeId, deadline, priority, status) durch. */
   const handleTaskUpdate = async (taskId, changes) => {
     const previousTasks = tasks
 
@@ -193,21 +173,6 @@ function App() {
       setTasks(previousTasks)
       loadTasks()
       throw err
-    }
-  }
-
-  const handleAssignTaskToMe = async (taskId) => {
-    const assigneeName = user?.firstName || user?.name || user?.email || 'Ich'
-
-    setTasks((prev) => prev.map((t) => (
-      t.id === taskId ? { ...t, assignee: assigneeName } : t
-    )))
-
-    try {
-      const res = await api.put(`/tasks/${taskId}`, { assignee: assigneeName })
-      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, ...res.data } : t)))
-    } catch {
-      loadTasks()
     }
   }
 
@@ -289,7 +254,6 @@ function App() {
         user={user}
         onClose={handleCloseTaskDetail}
         onTaskUpdate={handleTaskUpdate}
-        onTaskAssigneeChange={handleTaskAssigneeChange}
         onDelete={handleTaskDeleted}
       />
     ),
@@ -321,6 +285,7 @@ function App() {
       {showCreateTask && (
         <CreateTaskModal
           meetings={meetings}
+          user={user}
           onClose={() => setShowCreateTask(false)}
           onCreated={handleTaskCreated}
         />

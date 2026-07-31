@@ -1,9 +1,7 @@
 const DAY_IN_MS = 24 * 60 * 60 * 1000
 
 export function isUnassignedTask(task) {
-  const assignee = task?.assignee
-
-  return assignee === null || assignee === undefined || String(assignee).trim() === ''
+  return !task?.assigneeId
 }
 
 export function isOpenTask(task) {
@@ -12,6 +10,19 @@ export function isOpenTask(task) {
 
 export function getUnassignedTasks(tasks = []) {
   return tasks.filter((task) => isOpenTask(task) && isUnassignedTask(task))
+}
+
+/** Anzeigename für die Zuständigkeit, inkl. Hinweis auf unbestätigten KI-Vorschlag. */
+export function assigneeDisplayLabel(task) {
+  if (task?.assigneeName) {
+    return task.assigneeName
+  }
+
+  if (task?.aiSuggestedAssigneeName) {
+    return `KI-Vorschlag: ${task.aiSuggestedAssigneeName} (nicht zugeordnet)`
+  }
+
+  return null
 }
 
 export function priorityLabel(priority) {

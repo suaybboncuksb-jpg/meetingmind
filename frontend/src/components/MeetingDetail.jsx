@@ -20,16 +20,6 @@ const TABS = [
   { key: 'followup', label: 'Nachbereitung' },
 ]
 
-function priorityLabel(priority) {
-  const labels = {
-    HIGH: 'Hoch',
-    MEDIUM: 'Mittel',
-    LOW: 'Niedrig',
-  }
-
-  return labels[String(priority || '').toUpperCase()] || 'Mittel'
-}
-
 function textOfItem(item) {
   if (!item) return ''
   if (typeof item === 'string') return item
@@ -76,6 +66,7 @@ function AnalysisResultList({ title, items = [], empty = 'Noch nichts erkannt.',
     decision: 'border-emerald-100 bg-emerald-50 text-emerald-800',
     question: 'border-amber-100 bg-amber-50 text-amber-800',
     step: 'border-blue-100 bg-blue-50 text-brand',
+    deadline: 'border-purple-100 bg-purple-50 text-purple-800',
     default: 'border-line bg-canvas/70 text-ink',
   }[tone] || 'border-line bg-canvas/70 text-ink'
 
@@ -137,10 +128,35 @@ function PreviewList({ title, items = [], empty = 'Keine Einträge erkannt.' }) 
   )
 }
 
+/** Fristen-Vorschau: description + optionales Datum, statt reinem Text. */
+function DeadlinePreviewList({ items = [] }) {
+  return (
+    <div>
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">Fristen</p>
+
+      {items.length === 0 ? (
+        <p className="mt-2 text-[12.5px] text-muted">Keine eigenständigen Fristen erkannt.</p>
+      ) : (
+        <ul className="mt-2 space-y-2">
+          {items.map((item, index) => (
+            <li key={`deadline-${index}`} className="rounded-2xl border border-line bg-canvas/70 px-3 py-2 text-[13px] leading-relaxed text-ink">
+              <span>{item.description}</span>
+              {item.date ? (
+                <span className="ml-2 font-semibold text-brand">({item.date})</span>
+              ) : (
+                <span className="ml-2 text-muted">(Datum unklar)</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreated, onDelete }) {
   const [activeTab, setActiveTab] = useState('overview')
   const [transcript, setTranscript] = useState(meeting?.transcript || '')
-  const [analyzing, setAnalyzing] = useState(false)
   const [followUp, setFollowUp] = useState(null)
   const [loadingFollowUp, setLoadingFollowUp] = useState(false)
   const [qualityScore, setQualityScore] = useState(null)
@@ -268,30 +284,6 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
     }
   }
 
-  async function handleAnalyze() {
-    if (!transcript.trim()) {
-      setError('Bitte füge zuerst ein Protokoll ein.')
-      return
-    }
-
-    const preparedTranscript = cleanTranscript(transcript, { reduceFillers: false })
-
-    setTranscript(preparedTranscript)
-    setAnalyzing(true)
-    setError('')
-
-    try {
-      const res = await api.post(`/meetings/${meeting.id}/analyze`, { transcript: preparedTranscript.trim() })
-      onUpdated(res.data)
-      setActiveTab('analysis')
-    } catch (err) {
-      onUpdated?.({ ...meeting, status: 'ANALYSIS_FAILED' })
-      setError(getApiErrorMessage(err, 'Analyse fehlgeschlagen. Bitte prüfe API-Key, Protokoll und KI-Verbindung.'))
-    } finally {
-      setAnalyzing(false)
-    }
-  }
-
   async function handleCreateTaskFromQuestion(question) {
     const cleanQuestion = String(question || '').trim()
 
@@ -311,7 +303,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
     try {
       const res = await api.post('/tasks', {
         title: taskTitle,
-        assignee: null,
+        assigneeId: null,
         deadline: null,
         priority: 'MEDIUM',
         meetingId: meeting.id,
@@ -494,7 +486,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                       {analysisDetails?.summary || meeting.aiSummary ? 'Analyse vorhanden' : 'Noch keine Analyse vorhanden'}
                     </h3>
                     <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                      Entscheidungen, offene Fragen und nächste Schritte erscheinen im Tab „KI-Analyse".
+                      Entscheidungen, Fristen, offene Fragen und nächste Schritte erscheinen im Tab „KI-Analyse".
                     </p>
                     <div className="mt-4">
                       <Button variant="secondary" onClick={() => setActiveTab('analysis')}>
@@ -519,7 +511,8 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                           Prüfe die KI-Ergebnisse vor dem Speichern.
                         </h3>
                         <p className="mt-2 text-[13px] leading-relaxed text-muted">
-                          Wenn die Vorschau passt, kannst du sie übernehmen. Danach werden Zusammenfassung und Aufgaben gespeichert.
+                          Wenn die Vorschau passt, kannst du sie übernehmen. Aufgaben werden danach als KI-Vorschlag angelegt
+                          und müssen unter „Aufgaben & Fristen" noch einzeln bestätigt werden.
                         </p>
                       </div>
 
@@ -537,6 +530,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
 
                     <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
                       <PreviewList title="Erkannte Aufgaben" items={analysisPreview.actionItems || []} />
+                      <DeadlinePreviewList items={analysisPreview.deadlines || []} />
                       <PreviewList title="Entscheidungen" items={analysisPreview.decisions || []} />
                       <PreviewList title="Offene Fragen" items={analysisPreview.questions || []} />
                       <PreviewList title="Nächste Schritte" items={analysisPreview.nextSteps || []} />
@@ -551,7 +545,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                         Gespeicherte Analyse
                       </p>
                       <h3 className="mt-2 text-[20px] font-semibold text-ink">
-                        Zusammenfassung, Entscheidungen und Aufgaben
+                        Zusammenfassung, Entscheidungen, Fristen und Aufgaben
                       </h3>
                       <p className="mt-2 text-[13px] leading-relaxed text-muted">
                         Status: {analysisStatus === 'PENDING' ? 'Ausstehend' : analysisStatus}
@@ -582,6 +576,13 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                       items={analysisDetails?.decisions || []}
                       empty="Noch keine Entscheidungen dokumentiert."
                       tone="decision"
+                    />
+
+                    <AnalysisResultList
+                      title="Fristen"
+                      items={analysisDetails?.deadlines || []}
+                      empty="Keine eigenständigen Fristen erkannt."
+                      tone="deadline"
                     />
 
                     <AnalysisResultList
@@ -631,7 +632,7 @@ export default function MeetingDetail({ meeting, onClose, onUpdated, onTaskCreat
                   <div className="rounded-[24px] border border-line bg-canvas/70 px-5 py-6 text-center">
                     <p className="text-[13px] font-semibold text-ink">Noch keine Analyse vorhanden</p>
                     <p className="mt-1 text-[12.5px] leading-relaxed text-muted">
-                      Sobald ein Protokoll analysiert wurde, erscheinen hier Entscheidungen, offene Fragen, nächste Schritte und erkannte Aufgaben.
+                      Sobald ein Protokoll analysiert wurde, erscheinen hier Entscheidungen, Fristen, offene Fragen, nächste Schritte und erkannte Aufgaben.
                     </p>
                   </div>
                 )}
@@ -704,7 +705,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                         size="sm"
                         variant="secondary"
                         onClick={() => handleCleanTranscript(false)}
-                        disabled={!transcript.trim() || analyzing}
+                        disabled={!transcript.trim() || loadingPreview}
                       >
                         Protokoll bereinigen
                       </Button>
@@ -713,7 +714,7 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                         size="sm"
                         variant="secondary"
                         onClick={() => handleCleanTranscript(true)}
-                        disabled={!transcript.trim() || analyzing}
+                        disabled={!transcript.trim() || loadingPreview}
                       >
                         Füllwörter reduzieren
                       </Button>
@@ -723,17 +724,9 @@ Mehmet: Ich kläre die technischen Fragen bis Mittwoch.`}
                       <Button
                         icon={SparklesIcon}
                         onClick={handleCreateAnalysisPreview}
-                        disabled={loadingPreview || analyzing}
+                        disabled={loadingPreview}
                       >
                         {loadingPreview ? 'Erstellt Vorschau…' : 'KI-Vorschau erstellen'}
-                      </Button>
-
-                      <Button
-                        variant="secondary"
-                        onClick={handleAnalyze}
-                        disabled={analyzing || loadingPreview}
-                      >
-                        {analyzing ? 'Analysiere…' : 'Protokoll analysieren'}
                       </Button>
                     </div>
                   </div>
